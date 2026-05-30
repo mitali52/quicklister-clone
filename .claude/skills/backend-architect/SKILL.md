@@ -269,18 +269,101 @@ async handleWebhook(event: Stripe.Event): Promise<void> {
 }
 ```
 
-### Error Handling
+### Error Handling — Repository Layer
+
+Every repository method wraps its query in `try/catch` and calls `handleDbError()` from
+`database/helpers/query.helper.ts`. `handleDbError` translates PostgreSQL error codes into
+typed NestJS exceptions before they reach the service:
 
 ```typescript
-// Expected business errors — throw NestJS exceptions from service
-throw new NotFoundException(`Property ${id} not found`);
-throw new ForbiddenException('You do not own this property');
-throw new ConflictException('Listing limit reached for this subscription period');
-throw new BadRequestException('Listing cannot be submitted — verification documents missing');
+// PG error code → NestJS exception mapping (in handleDbError)
+// 23505 unique_violation    → ConflictException
+// 23503 foreign_key_violation → BadRequestException
+// 23502 not_null_violation  → BadRequestException
+// anything else             → InternalServerErrorException
 
-// Unexpected errors — let them bubble to the global exception filter
-// DO NOT wrap everything in try/catch and swallow errors
+async findAll(): Promise<Role[]> {
+  try {
+    const result = await this.pool.query<RoleRow>('SELECT * FROM roles');
+    return result.rows.map(toDomain);
+  } catch (err) {
+    handleDbError(err, 'RolesRepository.findAll'); // second arg is logged as context
+  }
+}
 ```
+
+- Always pass a context string (`'ClassName.methodName'`) — it appears in server logs.
+- Never swallow an error silently. Every catch block must either rethrow or call `handleDbError`.
+- Never return `null` / `undefined` from a catch block to hide a failure.
+
+### Error Handling — Service Layer
+
+Services re-throw typed NestJS exceptions from the repository and add their own business
+exceptions on top. The pattern guards against accidentally wrapping an already-typed
+exception in a generic `InternalServerErrorException`:
+
+```typescript
+async findById(id: string): Promise<User> {
+  try {
+    const user = await this.repo.findById(id);
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    return user;
+  } catch (err) {
+    if (err instanceof NotFoundException) throw err;   // re-throw typed exceptions
+    if (err instanceof ConflictException) throw err;
+    if (err instanceof ForbiddenException) throw err;
+    throw new InternalServerErrorException('Failed to retrieve user');
+  }
+}
+```
+
+**Rule:** The first lines of every `catch` block in a service must re-throw all NestJS
+`HttpException` subclasses before falling through to the generic wrapper. Otherwise a
+`NotFoundException` thrown inside the `try` will be swallowed and replaced with a 500.
+
+### Transactions — Explicit Commit and Rollback
+
+Use `transaction()` from `database/helpers/query.helper.ts` for every operation that
+writes to more than one row or table. `transaction()` issues `BEGIN`, calls your function,
+then `COMMIT` on success or `ROLLBACK` on any error — including the errors thrown by
+`handleDbError`.
+
+```typescript
+async create(data: CreateUserData): Promise<User> {
+  return transaction(this.pool, async (client: PoolClient) => {
+    try {
+      // Step 1 — insert user
+      const userResult = await client.query<UserRow>(
+        'INSERT INTO users (...) VALUES (...) RETURNING *',
+        [...],
+      );
+      const row = userResult.rows[0];
+      if (!row) throw new Error('Insert returned no row');
+
+      // Step 2 — insert audit log (same transaction → atomic)
+      await client.query(
+        'INSERT INTO audit_log (user_id, action) VALUES ($1, $2)',
+        [row.id, 'user.created'],
+      );
+
+      return toDomain(row);
+    } catch (err) {
+      // ROLLBACK is issued automatically by transaction() before this throws
+      handleDbError(err, 'UsersRepository.create');
+    }
+  });
+}
+```
+
+**Transaction rules:**
+- Use `client` (the `PoolClient` passed by `transaction()`) for every query inside the
+  callback — not `this.pool`. Queries on `this.pool` open a separate connection outside
+  the transaction.
+- Single-table writes with one query do not need `transaction()` — the implicit autocommit
+  is sufficient.
+- `ROLLBACK` is guaranteed by `transaction()` even if `handleDbError` throws. Never call
+  `ROLLBACK` manually inside the callback.
+- Never use `transaction()` for read-only queries — it holds a connection for no benefit.
 
 ---
 
@@ -314,6 +397,18 @@ multiple tables atomically.
 - [ ] Repository returns domain objects, not raw `pg` row types
 - [ ] No cross-module internal imports (only consuming exported module APIs)
 - [ ] No circular module dependencies (`import/no-cycle` ESLint passes)
+
+### Error Handling
+- [ ] Every repository method has a `try/catch` that calls `handleDbError(err, 'Context')`
+- [ ] No catch block swallows an error silently (no empty catch, no `return null` on error)
+- [ ] Service catch blocks re-throw all `HttpException` subclasses before the generic wrapper
+- [ ] `handleDbError` context string follows `'ClassName.methodName'` format
+
+### Transactions
+- [ ] Multi-row / multi-table writes use `transaction(this.pool, async (client) => { ... })`
+- [ ] All queries inside a transaction callback use `client`, not `this.pool`
+- [ ] No manual `BEGIN` / `COMMIT` / `ROLLBACK` calls — always use the `transaction()` helper
+- [ ] Read-only methods do not use `transaction()`
 
 ### TypeScript
 - [ ] Zero TypeScript errors (`pnpm typecheck`)

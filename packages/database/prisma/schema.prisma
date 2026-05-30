@@ -1,0 +1,72 @@
+// This is the Prisma schema for the Quicklister platform.
+// Source of truth for all database tables and migrations.
+//
+// docs/database-requirements.md — full SQL DDL and design notes
+// docs/data-entities.md        — entity relationship descriptions
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum UserRoleName {
+  seller
+  landlord
+  commercial_owner
+  pro_lister
+  admin
+
+  @@map("user_role_name")
+}
+
+// ─── Role ──────────────────────────────────────────────────────────────────
+
+model Role {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        UserRoleName @unique
+  description String       @default("")
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @db.Timestamptz
+
+  users User[]
+
+  @@map("roles")
+}
+
+// ─── User ──────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId        String    @db.Uuid
+  role          Role      @relation(fields: [roleId], references: [id])
+
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  phoneNumber   String?   @map("phone_number")
+
+  addressLine1  String?   @map("address_line1")
+  addressLine2  String?   @map("address_line2")
+  city          String?
+  county        String?
+  postcode      String?
+
+  emailVerified Boolean   @default(false) @map("email_verified")
+  nrlaMember    Boolean   @default(false) @map("nrla_member")
+
+  createdAt     DateTime  @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt     DateTime  @updatedAt @db.Timestamptz @map("updated_at")
+  deletedAt     DateTime? @db.Timestamptz @map("deleted_at")
+
+  @@index([roleId])
+  @@index([email])
+  @@index([deletedAt])
+
+  @@map("users")
+}

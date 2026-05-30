@@ -401,21 +401,30 @@ apps/api/
 
 ---
 
-## `packages/database/` — Prisma
+## `apps/api/src/database/` — Database Layer
 
 ```
-packages/database/
+apps/api/src/database/
 │
-├── prisma/
-│   ├── schema.prisma               # Complete database schema
-│   ├── migrations/                 # Auto-generated migration files
-│   └── seed.ts                     # Seed script (packages, add-ons, admin user)
+├── helpers/
+│   └── query.helper.ts             # Typed query(), queryOne(), transaction() wrappers
 │
-├── src/
-│   └── index.ts                    # Exports PrismaClient singleton
+├── interfaces/
+│   └── migration.interface.ts      # MigrationBuilder + Migration types
 │
-├── package.json
-└── tsconfig.json
+├── migrations/                     # node-pg-migrate JS migration files
+│   ├── 20260530000000-enable-pgcrypto-extension.js
+│   ├── 20260530000001-create-roles-table.js
+│   └── 20260530000002-create-users-table.js
+│
+├── seeders/
+│   ├── role.seeder.ts              # Upserts admin / moderator / user roles
+│   └── index.ts                    # Entry point — runs all seeders
+│
+├── config.js                       # node-pg-migrate connection config (per env)
+├── database.config.ts              # Reads DATABASE_URL, throws if missing
+├── database.module.ts              # @Global() NestJS module, exports DATABASE_POOL
+└── database.providers.ts           # pg.Pool factory bound to DATABASE_POOL symbol
 ```
 
 ---

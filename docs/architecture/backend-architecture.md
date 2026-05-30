@@ -168,19 +168,20 @@ Services check `property.user_id === request.user.id` before any mutation. A use
 
 ## Database Layer (Prisma)
 
-### PrismaModule
-- Single `PrismaClient` instance shared globally (connection pooling)
-- `onModuleInit()` calls `$connect()`
-- `onModuleDestroy()` calls `$disconnect()`
+### DatabaseModule
+- Single `pg.Pool` instance shared globally via `DATABASE_POOL` injection token
+- `@Global()` — imported once in `AppModule`, available everywhere
+- `database.providers.ts` configures max 10 connections, 30s idle timeout
+- Repositories inject `Pool` via `@Inject(DATABASE_POOL)`
 
 ### Query Patterns
 ```
-Read (list):      prisma.property.findMany({ where, orderBy, skip, take })
-Read (single):    prisma.property.findUniqueOrThrow({ where: { id } })
-Create:           prisma.property.create({ data })
-Update:           prisma.property.update({ where: { id }, data })
-Soft actions:     update status to 'archived' rather than delete
-Transactions:     prisma.$transaction([...]) for multi-table operations
+Read (list):      pool.query('SELECT * FROM properties WHERE ... LIMIT $1 OFFSET $2', [...])
+Read (single):    queryOne(pool, 'SELECT * FROM properties WHERE id = $1', [id])
+Create:           pool.query('INSERT INTO properties (...) VALUES (...) RETURNING *', [...])
+Update:           pool.query('UPDATE properties SET ... WHERE id = $1 RETURNING *', [...])
+Soft actions:     UPDATE SET deleted_at = NOW() rather than DELETE
+Transactions:     transaction(pool, async (client) => { ... }) for multi-table operations
 ```
 
 ### Location Search
@@ -217,7 +218,7 @@ All side effects that shouldn't block the HTTP response are offloaded to queues.
 ```
 Admin approves listing
   → VerificationService.approve(id)
-      → prisma: update property status to 'active'
+      → pool.query: UPDATE properties SET status = 'active' WHERE id = $1
       → for each portal in package.portals_included:
           → portalSyncQueue.add('submit', { propertyId, portal })
       → emailQueue.add('listing-approved', { userId, propertyId })

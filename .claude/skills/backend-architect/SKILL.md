@@ -106,7 +106,7 @@ export class PropertiesService {
 }
 ```
 
-- Services never import from `@prisma/client`. They call `this.repo.*`.
+- Services never call `pool.query` directly. They call `this.repo.*`.
 - Services throw typed NestJS exceptions for expected failures:
   `NotFoundException`, `ForbiddenException`, `BadRequestException`, `ConflictException`.
 - Side effects (email, queue jobs) go after the primary operation.
@@ -130,21 +130,26 @@ export const PROPERTY_REPOSITORY = Symbol('PROPERTY_REPOSITORY');
 
 // Implementation
 @Injectable()
-export class PrismaPropertyRepository implements IPropertyRepository {
-  constructor(private readonly prisma: PrismaService) {}
+export class PgPropertyRepository implements IPropertyRepository {
+  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
 
   async findById(id: string): Promise<Property | null> {
-    const row = await this.prisma.property.findUnique({ where: { id } });
+    const row = await queryOne<PropertyRow>(
+      this.pool,
+      'SELECT * FROM properties WHERE id = $1 AND deleted_at IS NULL',
+      [id],
+    );
     return row ? PropertyMapper.toDomain(row) : null;
   }
 }
 ```
 
-- Repositories are the **only** place that imports `PrismaService` or `@prisma/client`.
-- Every repository maps Prisma rows to domain objects with a `Mapper` class in the same file.
+- Repositories are the **only** place that injects `DATABASE_POOL` or calls `pool.query`.
+- Every repository maps raw `pg` result rows to domain objects with a `Mapper` in the same file.
 - Return `null` for not-found, never throw `NotFoundException` from a repository.
   The service decides whether null is an error.
 - Queries must be paginated. No repository method returns an unbounded list.
+- All read queries must include `AND deleted_at IS NULL` for soft-deleted tables.
 
 ### DTO Rules
 
@@ -295,8 +300,9 @@ requires only a new adapter class — no changes to `PortalsService`.
 `{ page: number; limit: number }` and returns `{ data: T[]; total: number }`.
 Maximum `limit` is enforced at the DTO level (`@Max(100)`).
 
-**Transactions for multi-table writes.** Use `prisma.$transaction([...])` whenever
-a business operation must write to multiple tables atomically.
+**Transactions for multi-table writes.** Use `transaction(pool, async (client) => { ... })`
+from `database/helpers/query.helper.ts` whenever a business operation must write to
+multiple tables atomically.
 
 ---
 
@@ -304,15 +310,15 @@ a business operation must write to multiple tables atomically.
 
 ### Architecture
 - [ ] Controller has no business logic — only routes, parses, delegates, maps
-- [ ] Service has no Prisma imports — only repository calls and domain logic
-- [ ] Repository returns domain objects, not Prisma model types
+- [ ] Service has no `pool.query` calls — only repository calls and domain logic
+- [ ] Repository returns domain objects, not raw `pg` row types
 - [ ] No cross-module internal imports (only consuming exported module APIs)
 - [ ] No circular module dependencies (`import/no-cycle` ESLint passes)
 
 ### TypeScript
 - [ ] Zero TypeScript errors (`pnpm typecheck`)
 - [ ] No `any`, no `!`, no `@ts-ignore`
-- [ ] Response DTOs expose no internal fields (no raw Prisma types in responses)
+- [ ] Response DTOs expose no internal fields (no raw pg row types in responses)
 
 ### API Correctness
 - [ ] Correct HTTP status codes (201 for POST, 204 for DELETE, etc.)

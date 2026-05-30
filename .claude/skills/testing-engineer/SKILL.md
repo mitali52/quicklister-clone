@@ -178,7 +178,7 @@ describe('PropertiesService', () => {
 // test/helpers/app.factory.ts
 export async function createTestApp(): Promise<{
   app: INestApplication;
-  prisma: PrismaService;
+  pool: Pool;
 }> {
   const module = await Test.createTestingModule({
     imports: [AppModule],
@@ -188,7 +188,7 @@ export async function createTestApp(): Promise<{
   applyGlobalConfig(app); // same pipes, filters, interceptors as production
   await app.init();
 
-  return { app, prisma: module.get(PrismaService) };
+  return { app, pool: module.get<Pool>(DATABASE_POOL) };
 }
 
 // test/helpers/auth.helper.ts
@@ -208,20 +208,20 @@ export async function loginAsUser(
 // properties.e2e.spec.ts
 describe('PropertiesController (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
+  let pool: Pool;
 
   beforeAll(async () => {
-    ({ app, prisma } = await createTestApp());
+    ({ app, pool } = await createTestApp());
   });
 
   afterEach(async () => {
-    // Clean tables in dependency order (child before parent)
-    await prisma.propertyPhoto.deleteMany();
-    await prisma.property.deleteMany();
+    // Clean tables in FK dependency order (child before parent)
+    await pool.query('DELETE FROM property_photos');
+    await pool.query('DELETE FROM properties');
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await pool.query('DELETE FROM users');
     await app.close();
   });
 

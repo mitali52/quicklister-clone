@@ -2,7 +2,7 @@
 
 Analysis of [quicklister.co.uk](https://www.quicklister.co.uk/) for the purpose of building a clone.
 
-## Documents
+## Analysis
 
 | File | Description |
 |---|---|
@@ -17,3 +17,12 @@ Analysis of [quicklister.co.uk](https://www.quicklister.co.uk/) for the purpose 
 | [database-requirements.md](database-requirements.md) | Schema, indexes, and storage design |
 | [third-party-integrations.md](third-party-integrations.md) | External services and dependencies |
 | [pricing-model.md](pricing-model.md) | Packages, tiers, and add-ons |
+
+## Architecture
+
+| File | Description |
+|---|---|
+| [architecture/folder-structure.md](architecture/folder-structure.md) | Monorepo layout for all apps and packages |
+| [architecture/frontend-architecture.md](architecture/frontend-architecture.md) | Next.js app design — rendering, state, components, auth |
+| [architecture/backend-architecture.md](architecture/backend-architecture.md) | NestJS API design — modules, jobs, integrations, security |
+| [architecture/infrastructure-architecture.md](architecture/infrastructure-architecture.md) | AWS deployment, networking, CI/CD, monitoring |

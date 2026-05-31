@@ -7,8 +7,8 @@ export function SiteFooter() {
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           {/* Legal links */}
           <nav aria-label="Footer navigation" className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link href="/terms-of-use" className="text-xs text-slate-500 hover:text-slate-900">
-              Terms of use
+            <Link href="/terms-and-conditions" className="text-xs text-slate-500 hover:text-slate-900">
+              Terms and conditions
             </Link>
             <Link href="/cookie-policy" className="text-xs text-slate-500 hover:text-slate-900">
               Cookie policy

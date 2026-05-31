@@ -243,8 +243,8 @@ function Footer() {
         <div className="flex flex-col gap-4 border-t border-slate-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-6 text-xs text-slate-500">
-              <Link href="/terms-of-use" className="hover:text-slate-800">
-                Terms of use
+              <Link href="/terms-and-conditions" className="hover:text-slate-800">
+                Terms and conditions
               </Link>
               <Link href="/cookie-policy" className="hover:text-slate-800">
                 Cookie policy

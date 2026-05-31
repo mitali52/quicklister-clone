@@ -3,8 +3,11 @@ import Link from 'next/link';
 function LegalLinks() {
   return (
     <nav aria-label="Footer navigation" className="flex flex-wrap items-center gap-x-6 gap-y-2">
-      <Link href="/terms-of-use" className="text-xs text-slate-600 underline hover:text-slate-900">
-        Terms of use
+      <Link
+        href="/terms-and-conditions"
+        className="text-xs text-slate-600 underline hover:text-slate-900"
+      >
+        Terms and conditions
       </Link>
       <Link
         href="/cookie-policy"

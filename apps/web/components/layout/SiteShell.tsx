@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { SiteFooter } from './SiteFooter';
-import { SiteHeader } from './SiteHeader';
+import { MarketingHeader } from './MarketingHeader';
 
 const AUTH_PATHS = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
 
@@ -18,7 +18,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <SiteHeader />
+      <MarketingHeader theme="light" />
       <main id="main-content" className="flex-1">
         {children}
       </main>

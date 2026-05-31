@@ -1,33 +1,19 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { ModeratorDashboardService } from './moderator-dashboard.service';
 import {
-  MODERATOR_DASHBOARD_REPOSITORY,
-  type IModeratorDashboardRepository,
-} from './interfaces/moderator-dashboard-repository.interface';
+  DASHBOARD_REPOSITORY,
+  type IDashboardRepository,
+  type TodayReviewStats,
+} from './interfaces/dashboard-repository.interface';
 import type {
-  ModeratorDashboard,
-  RecentReview,
-  ReviewStats,
-  QueueStats,
   PaginatedRecentReviews,
+  RecentReview,
 } from './domain/moderator-dashboard';
 
 // ── Builders ──────────────────────────────────────────────────────────────────
 
-function buildReviewStats(overrides: Partial<ReviewStats> = {}): ReviewStats {
-  return {
-    pendingReviews: 12,
-    approvedToday: 5,
-    rejectedToday: 2,
-    ...overrides,
-  };
-}
-
-function buildQueueStats(overrides: Partial<QueueStats> = {}): QueueStats {
-  return {
-    listingsWaiting: 12,
-    ...overrides,
-  };
+function buildTodayReviewStats(overrides: Partial<TodayReviewStats> = {}): TodayReviewStats {
+  return { approvedToday: 5, rejectedToday: 2, ...overrides };
 }
 
 function buildRecentReview(overrides: Partial<RecentReview> = {}): RecentReview {
@@ -60,12 +46,18 @@ function buildPaginatedReviews(
   };
 }
 
-function buildDashboard(overrides: Partial<ModeratorDashboard> = {}): ModeratorDashboard {
+function buildRepo(): jest.Mocked<IDashboardRepository> {
   return {
-    reviewStats: buildReviewStats(),
-    queueStats: buildQueueStats(),
-    recentReviews: buildPaginatedReviews(),
-    ...overrides,
+    getUserProfile: jest.fn(),
+    getListingStats: jest.fn(),
+    getRecentListings: jest.fn(),
+    getUnreadNotificationCount: jest.fn(),
+    getPlatformUserStats: jest.fn(),
+    getPlatformOrganizationStats: jest.fn(),
+    getPlatformSystemStats: jest.fn(),
+    getPendingReviewCount: jest.fn(),
+    getTodayReviewStats: jest.fn(),
+    getRecentReviews: jest.fn(),
   };
 }
 
@@ -73,52 +65,68 @@ function buildDashboard(overrides: Partial<ModeratorDashboard> = {}): ModeratorD
 
 describe('ModeratorDashboardService', () => {
   let service: ModeratorDashboardService;
-  let repo: jest.Mocked<IModeratorDashboardRepository>;
+  let repo: jest.Mocked<IDashboardRepository>;
 
   beforeEach(() => {
-    repo = {
-      getDashboard: jest.fn(),
-    };
-
-    const providers = new Map([[MODERATOR_DASHBOARD_REPOSITORY, repo]]);
+    repo = buildRepo();
+    const providers = new Map([[DASHBOARD_REPOSITORY, repo]]);
     service = new ModeratorDashboardService(
-      providers.get(MODERATOR_DASHBOARD_REPOSITORY) as IModeratorDashboardRepository,
+      providers.get(DASHBOARD_REPOSITORY) as IDashboardRepository,
     );
   });
 
   // ── getDashboard ───────────────────────────────────────────────────────────
 
   describe('getDashboard', () => {
-    it('returns the moderator dashboard from the repository', async () => {
-      const expected = buildDashboard();
-      repo.getDashboard.mockResolvedValue(expected);
+    it('assembles and returns the moderator dashboard', async () => {
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats());
+      repo.getPendingReviewCount.mockResolvedValue(12);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
 
       const result = await service.getDashboard();
 
-      expect(result).toEqual(expected);
+      expect(result.reviewStats.approvedToday).toBe(5);
+      expect(result.reviewStats.rejectedToday).toBe(2);
+      expect(result.reviewStats.pendingReviews).toBe(12);
+      expect(result.queueStats.listingsWaiting).toBe(12);
     });
 
     it('calls repository with default page=1 and limit=10 when no params supplied', async () => {
-      repo.getDashboard.mockResolvedValue(buildDashboard());
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats());
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
 
       await service.getDashboard();
 
-      expect(repo.getDashboard).toHaveBeenCalledWith(1, 10);
+      expect(repo.getRecentReviews).toHaveBeenCalledWith(1, 10);
     });
 
     it('passes custom page and limit through to the repository', async () => {
-      repo.getDashboard.mockResolvedValue(buildDashboard());
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats());
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
 
       await service.getDashboard(3, 25);
 
-      expect(repo.getDashboard).toHaveBeenCalledWith(3, 25);
+      expect(repo.getRecentReviews).toHaveBeenCalledWith(3, 25);
     });
 
-    it('returns zero review stats when no reviews have occurred today', async () => {
-      const dashboard = buildDashboard({
-        reviewStats: buildReviewStats({ approvedToday: 0, rejectedToday: 0 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+    it('derives pendingReviews and listingsWaiting from the same getPendingReviewCount call', async () => {
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats());
+      repo.getPendingReviewCount.mockResolvedValue(7);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
+
+      const result = await service.getDashboard();
+
+      expect(result.reviewStats.pendingReviews).toBe(7);
+      expect(result.queueStats.listingsWaiting).toBe(7);
+      expect(repo.getPendingReviewCount).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns zero review stats when no reviews occurred today', async () => {
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats({ approvedToday: 0, rejectedToday: 0 }));
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews({ items: [], total: 0, totalPages: 0 }));
 
       const result = await service.getDashboard();
 
@@ -126,26 +134,15 @@ describe('ModeratorDashboardService', () => {
       expect(result.reviewStats.rejectedToday).toBe(0);
     });
 
-    it('returns an empty recentReviews list when no reviews exist', async () => {
-      const dashboard = buildDashboard({
-        recentReviews: buildPaginatedReviews({ items: [], total: 0, totalPages: 0 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
-
-      const result = await service.getDashboard();
-
-      expect(result.recentReviews.items).toHaveLength(0);
-      expect(result.recentReviews.total).toBe(0);
-    });
-
     it('includes correct pagination metadata in recentReviews', async () => {
       const reviews = Array.from({ length: 5 }, (_, i) =>
         buildRecentReview({ id: `review-uuid-${i + 1}` }),
       );
-      const dashboard = buildDashboard({
-        recentReviews: buildPaginatedReviews({ items: reviews, total: 47, page: 2, limit: 5, totalPages: 10 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+      repo.getTodayReviewStats.mockResolvedValue(buildTodayReviewStats());
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(
+        buildPaginatedReviews({ items: reviews, total: 47, page: 2, limit: 5, totalPages: 10 }),
+      );
 
       const result = await service.getDashboard(2, 5);
 
@@ -157,13 +154,17 @@ describe('ModeratorDashboardService', () => {
     });
 
     it('re-throws InternalServerErrorException from the repository', async () => {
-      repo.getDashboard.mockRejectedValue(new InternalServerErrorException());
+      repo.getTodayReviewStats.mockRejectedValue(new InternalServerErrorException());
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
 
       await expect(service.getDashboard()).rejects.toThrow(InternalServerErrorException);
     });
 
     it('wraps unexpected repository errors in InternalServerErrorException', async () => {
-      repo.getDashboard.mockRejectedValue(new Error('query timeout'));
+      repo.getTodayReviewStats.mockRejectedValue(new Error('query timeout'));
+      repo.getPendingReviewCount.mockResolvedValue(0);
+      repo.getRecentReviews.mockResolvedValue(buildPaginatedReviews());
 
       await expect(service.getDashboard()).rejects.toThrow(InternalServerErrorException);
     });

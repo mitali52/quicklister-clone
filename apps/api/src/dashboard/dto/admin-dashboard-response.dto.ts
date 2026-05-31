@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { ListingStats } from '../domain/dashboard';
 import type {
   AdminDashboard,
   AdminUserStats,
   AdminOrganizationStats,
-  AdminListingStats,
   AdminModerationStats,
   AdminSystemStats,
 } from '../domain/admin-dashboard';
@@ -41,7 +41,7 @@ export class AdminListingStatsDto {
   @ApiProperty() approvedListings: number;
   @ApiProperty() rejectedListings: number;
 
-  static fromDomain(stats: AdminListingStats): AdminListingStatsDto {
+  static fromDomain(stats: ListingStats): AdminListingStatsDto {
     const dto = new AdminListingStatsDto();
     dto.totalListings = stats.totalListings;
     dto.draftListings = stats.draftListings;

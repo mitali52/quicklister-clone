@@ -1,3 +1,5 @@
+import type { ListingStats } from './dashboard';
+
 export interface AdminUserStats {
   totalUsers: number;
   activeUsers: number;
@@ -7,14 +9,6 @@ export interface AdminUserStats {
 export interface AdminOrganizationStats {
   totalOrganizations: number;
   activeOrganizations: number;
-}
-
-export interface AdminListingStats {
-  totalListings: number;
-  draftListings: number;
-  pendingListings: number;
-  approvedListings: number;
-  rejectedListings: number;
 }
 
 export interface AdminModerationStats {
@@ -29,7 +23,7 @@ export interface AdminSystemStats {
 export interface AdminDashboard {
   users: AdminUserStats;
   organizations: AdminOrganizationStats;
-  listings: AdminListingStats;
+  listings: ListingStats;
   moderation: AdminModerationStats;
   system: AdminSystemStats;
 }

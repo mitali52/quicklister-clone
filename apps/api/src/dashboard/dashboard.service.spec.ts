@@ -1,10 +1,10 @@
 import { NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { DashboardService } from './dashboard.service';
+import { UserDashboardService } from './dashboard.service';
 import {
   DASHBOARD_REPOSITORY,
   type IDashboardRepository,
 } from './interfaces/dashboard-repository.interface';
-import type { UserDashboard, ListingStats } from './domain/dashboard';
+import type { ListingStats } from './domain/dashboard';
 import type { User } from '../users/domain/user';
 import type { Listing } from '../listings/domain/listing';
 
@@ -33,7 +33,7 @@ function buildUser(overrides: Partial<User> = {}): User {
   };
 }
 
-function buildStats(overrides: Partial<ListingStats> = {}): ListingStats {
+function buildListingStats(overrides: Partial<ListingStats> = {}): ListingStats {
   return {
     totalListings: 5,
     draftListings: 2,
@@ -68,97 +68,129 @@ function buildListing(overrides: Partial<Listing> = {}): Listing {
   };
 }
 
-function buildDashboard(overrides: Partial<UserDashboard> = {}): UserDashboard {
+function buildRepo(): jest.Mocked<IDashboardRepository> {
   return {
-    profile: buildUser(),
-    stats: buildStats(),
-    recentListings: [buildListing()],
-    unreadNotifications: 3,
-    ...overrides,
+    getUserProfile: jest.fn(),
+    getListingStats: jest.fn(),
+    getRecentListings: jest.fn(),
+    getUnreadNotificationCount: jest.fn(),
+    getPlatformUserStats: jest.fn(),
+    getPlatformOrganizationStats: jest.fn(),
+    getPlatformSystemStats: jest.fn(),
+    getPendingReviewCount: jest.fn(),
+    getTodayReviewStats: jest.fn(),
+    getRecentReviews: jest.fn(),
   };
 }
 
 // ── Test suite ────────────────────────────────────────────────────────────────
 
-describe('DashboardService', () => {
-  let service: DashboardService;
+describe('UserDashboardService', () => {
+  let service: UserDashboardService;
   let repo: jest.Mocked<IDashboardRepository>;
 
   const USER_ID = 'user-uuid-1';
 
   beforeEach(() => {
-    repo = {
-      getUserDashboard: jest.fn(),
-    };
-
+    repo = buildRepo();
     const providers = new Map([[DASHBOARD_REPOSITORY, repo]]);
-    service = new DashboardService(providers.get(DASHBOARD_REPOSITORY) as IDashboardRepository);
+    service = new UserDashboardService(
+      providers.get(DASHBOARD_REPOSITORY) as IDashboardRepository,
+    );
   });
 
   // ── getUserDashboard ───────────────────────────────────────────────────────
 
   describe('getUserDashboard', () => {
-    it('returns the dashboard for the authenticated user', async () => {
-      const expected = buildDashboard();
-      repo.getUserDashboard.mockResolvedValue(expected);
+    it('assembles and returns the full dashboard for the authenticated user', async () => {
+      const profile = buildUser({ id: USER_ID });
+      const stats = buildListingStats();
+      const recentListings = [buildListing()];
+      const unreadNotifications = 3;
+
+      repo.getUserProfile.mockResolvedValue(profile);
+      repo.getListingStats.mockResolvedValue(stats);
+      repo.getRecentListings.mockResolvedValue(recentListings);
+      repo.getUnreadNotificationCount.mockResolvedValue(unreadNotifications);
 
       const result = await service.getUserDashboard(USER_ID);
 
-      expect(repo.getUserDashboard).toHaveBeenCalledWith(USER_ID);
-      expect(result).toEqual(expected);
+      expect(result.profile).toEqual(profile);
+      expect(result.stats).toEqual(stats);
+      expect(result.recentListings).toEqual(recentListings);
+      expect(result.unreadNotifications).toBe(unreadNotifications);
     });
 
-    it('throws NotFoundException when user does not exist', async () => {
-      repo.getUserDashboard.mockResolvedValue(null);
+    it('calls getListingStats with the authenticated user id, not null', async () => {
+      repo.getUserProfile.mockResolvedValue(buildUser());
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
+
+      await service.getUserDashboard(USER_ID);
+
+      expect(repo.getListingStats).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it('throws NotFoundException when the user profile does not exist', async () => {
+      repo.getUserProfile.mockResolvedValue(null);
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
 
       await expect(service.getUserDashboard(USER_ID)).rejects.toThrow(NotFoundException);
     });
 
-    it('includes correct listing stats shape', async () => {
-      const stats = buildStats({
-        totalListings: 10,
-        draftListings: 3,
-        pendingListings: 2,
-        approvedListings: 4,
-        rejectedListings: 1,
-      });
-      repo.getUserDashboard.mockResolvedValue(buildDashboard({ stats }));
-
-      const result = await service.getUserDashboard(USER_ID);
-
-      expect(result.stats.totalListings).toBe(10);
-      expect(result.stats.draftListings).toBe(3);
-      expect(result.stats.pendingListings).toBe(2);
-      expect(result.stats.approvedListings).toBe(4);
-      expect(result.stats.rejectedListings).toBe(1);
-    });
-
-    it('returns an empty recentListings array when user has no listings', async () => {
-      repo.getUserDashboard.mockResolvedValue(
-        buildDashboard({ recentListings: [], stats: buildStats({ totalListings: 0 }) }),
-      );
-
-      const result = await service.getUserDashboard(USER_ID);
-
-      expect(result.recentListings).toHaveLength(0);
-    });
-
-    it('returns zero unreadNotifications when user has no unread notifications', async () => {
-      repo.getUserDashboard.mockResolvedValue(buildDashboard({ unreadNotifications: 0 }));
+    it('returns zero unreadNotifications when the user has read all notifications', async () => {
+      repo.getUserProfile.mockResolvedValue(buildUser());
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
 
       const result = await service.getUserDashboard(USER_ID);
 
       expect(result.unreadNotifications).toBe(0);
     });
 
+    it('returns empty recentListings when the user has no listings', async () => {
+      repo.getUserProfile.mockResolvedValue(buildUser());
+      repo.getListingStats.mockResolvedValue(buildListingStats({ totalListings: 0 }));
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
+
+      const result = await service.getUserDashboard(USER_ID);
+
+      expect(result.recentListings).toHaveLength(0);
+    });
+
+    it('calls all four repository methods exactly once', async () => {
+      repo.getUserProfile.mockResolvedValue(buildUser());
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
+
+      await service.getUserDashboard(USER_ID);
+
+      expect(repo.getUserProfile).toHaveBeenCalledTimes(1);
+      expect(repo.getListingStats).toHaveBeenCalledTimes(1);
+      expect(repo.getRecentListings).toHaveBeenCalledTimes(1);
+      expect(repo.getUnreadNotificationCount).toHaveBeenCalledTimes(1);
+    });
+
     it('re-throws InternalServerErrorException from the repository', async () => {
-      repo.getUserDashboard.mockRejectedValue(new InternalServerErrorException());
+      repo.getUserProfile.mockRejectedValue(new InternalServerErrorException());
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
 
       await expect(service.getUserDashboard(USER_ID)).rejects.toThrow(InternalServerErrorException);
     });
 
     it('wraps unexpected repository errors in InternalServerErrorException', async () => {
-      repo.getUserDashboard.mockRejectedValue(new Error('connection refused'));
+      repo.getUserProfile.mockRejectedValue(new Error('connection refused'));
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getRecentListings.mockResolvedValue([]);
+      repo.getUnreadNotificationCount.mockResolvedValue(0);
 
       await expect(service.getUserDashboard(USER_ID)).rejects.toThrow(InternalServerErrorException);
     });

@@ -1,19 +1,28 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { AdminDashboardService } from './admin-dashboard.service';
 import {
-  ADMIN_DASHBOARD_REPOSITORY,
-  type IAdminDashboardRepository,
-} from './interfaces/admin-dashboard-repository.interface';
+  DASHBOARD_REPOSITORY,
+  type IDashboardRepository,
+} from './interfaces/dashboard-repository.interface';
+import type { ListingStats } from './domain/dashboard';
 import type {
-  AdminDashboard,
   AdminUserStats,
   AdminOrganizationStats,
-  AdminListingStats,
-  AdminModerationStats,
   AdminSystemStats,
 } from './domain/admin-dashboard';
 
 // ── Builders ──────────────────────────────────────────────────────────────────
+
+function buildListingStats(overrides: Partial<ListingStats> = {}): ListingStats {
+  return {
+    totalListings: 250,
+    draftListings: 80,
+    pendingListings: 15,
+    approvedListings: 140,
+    rejectedListings: 15,
+    ...overrides,
+  };
+}
 
 function buildUserStats(overrides: Partial<AdminUserStats> = {}): AdminUserStats {
   return { totalUsers: 100, activeUsers: 90, blockedUsers: 10, ...overrides };
@@ -25,33 +34,22 @@ function buildOrganizationStats(
   return { totalOrganizations: 20, activeOrganizations: 18, ...overrides };
 }
 
-function buildListingStats(overrides: Partial<AdminListingStats> = {}): AdminListingStats {
-  return {
-    totalListings: 250,
-    draftListings: 80,
-    pendingListings: 15,
-    approvedListings: 140,
-    rejectedListings: 15,
-    ...overrides,
-  };
-}
-
-function buildModerationStats(overrides: Partial<AdminModerationStats> = {}): AdminModerationStats {
-  return { pendingReviews: 15, ...overrides };
-}
-
 function buildSystemStats(overrides: Partial<AdminSystemStats> = {}): AdminSystemStats {
   return { notificationsSent: 5000, auditLogsGenerated: 12000, ...overrides };
 }
 
-function buildDashboard(overrides: Partial<AdminDashboard> = {}): AdminDashboard {
+function buildRepo(): jest.Mocked<IDashboardRepository> {
   return {
-    users: buildUserStats(),
-    organizations: buildOrganizationStats(),
-    listings: buildListingStats(),
-    moderation: buildModerationStats(),
-    system: buildSystemStats(),
-    ...overrides,
+    getUserProfile: jest.fn(),
+    getListingStats: jest.fn(),
+    getRecentListings: jest.fn(),
+    getUnreadNotificationCount: jest.fn(),
+    getPlatformUserStats: jest.fn(),
+    getPlatformOrganizationStats: jest.fn(),
+    getPlatformSystemStats: jest.fn(),
+    getPendingReviewCount: jest.fn(),
+    getTodayReviewStats: jest.fn(),
+    getRecentReviews: jest.fn(),
   };
 }
 
@@ -59,96 +57,87 @@ function buildDashboard(overrides: Partial<AdminDashboard> = {}): AdminDashboard
 
 describe('AdminDashboardService', () => {
   let service: AdminDashboardService;
-  let repo: jest.Mocked<IAdminDashboardRepository>;
+  let repo: jest.Mocked<IDashboardRepository>;
 
   beforeEach(() => {
-    repo = { getDashboard: jest.fn() };
-
-    const providers = new Map([[ADMIN_DASHBOARD_REPOSITORY, repo]]);
+    repo = buildRepo();
+    const providers = new Map([[DASHBOARD_REPOSITORY, repo]]);
     service = new AdminDashboardService(
-      providers.get(ADMIN_DASHBOARD_REPOSITORY) as IAdminDashboardRepository,
+      providers.get(DASHBOARD_REPOSITORY) as IDashboardRepository,
     );
   });
 
   // ── getDashboard ───────────────────────────────────────────────────────────
 
   describe('getDashboard', () => {
-    it('returns the admin dashboard from the repository', async () => {
-      const expected = buildDashboard();
-      repo.getDashboard.mockResolvedValue(expected);
+    it('assembles and returns the full admin dashboard', async () => {
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
 
       const result = await service.getDashboard();
 
-      expect(result).toEqual(expected);
+      expect(result.users.totalUsers).toBe(100);
+      expect(result.organizations.totalOrganizations).toBe(20);
+      expect(result.listings.totalListings).toBe(250);
+      expect(result.system.notificationsSent).toBe(5000);
     });
 
-    it('exposes correct user stats including blocked count', async () => {
-      const dashboard = buildDashboard({
-        users: buildUserStats({ totalUsers: 200, activeUsers: 180, blockedUsers: 20 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+    it('calls getListingStats with null for platform-wide scope', async () => {
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
 
-      const result = await service.getDashboard();
+      await service.getDashboard();
 
-      expect(result.users.totalUsers).toBe(200);
-      expect(result.users.activeUsers).toBe(180);
-      expect(result.users.blockedUsers).toBe(20);
+      expect(repo.getListingStats).toHaveBeenCalledWith(null);
     });
 
-    it('exposes correct organization stats', async () => {
-      const dashboard = buildDashboard({
-        organizations: buildOrganizationStats({ totalOrganizations: 50, activeOrganizations: 45 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+    it('derives moderation.pendingReviews from listings.pendingListings without an extra query', async () => {
+      const pendingListings = 7;
+      repo.getListingStats.mockResolvedValue(buildListingStats({ pendingListings }));
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
 
       const result = await service.getDashboard();
 
-      expect(result.organizations.totalOrganizations).toBe(50);
-      expect(result.organizations.activeOrganizations).toBe(45);
+      expect(result.moderation.pendingReviews).toBe(pendingListings);
+      expect(result.listings.pendingListings).toBe(pendingListings);
+      expect(repo.getPendingReviewCount).not.toHaveBeenCalled();
     });
 
     it('returns zero stats when the platform has no data', async () => {
-      const dashboard = buildDashboard({
-        users: buildUserStats({ totalUsers: 0, activeUsers: 0, blockedUsers: 0 }),
-        organizations: buildOrganizationStats({ totalOrganizations: 0, activeOrganizations: 0 }),
-        listings: buildListingStats({
-          totalListings: 0,
-          draftListings: 0,
-          pendingListings: 0,
-          approvedListings: 0,
-          rejectedListings: 0,
-        }),
-        moderation: buildModerationStats({ pendingReviews: 0 }),
-        system: buildSystemStats({ notificationsSent: 0, auditLogsGenerated: 0 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+      repo.getListingStats.mockResolvedValue(
+        buildListingStats({ totalListings: 0, draftListings: 0, pendingListings: 0, approvedListings: 0, rejectedListings: 0 }),
+      );
+      repo.getPlatformUserStats.mockResolvedValue(
+        buildUserStats({ totalUsers: 0, activeUsers: 0, blockedUsers: 0 }),
+      );
+      repo.getPlatformOrganizationStats.mockResolvedValue(
+        buildOrganizationStats({ totalOrganizations: 0, activeOrganizations: 0 }),
+      );
+      repo.getPlatformSystemStats.mockResolvedValue(
+        buildSystemStats({ notificationsSent: 0, auditLogsGenerated: 0 }),
+      );
 
       const result = await service.getDashboard();
 
       expect(result.users.totalUsers).toBe(0);
       expect(result.listings.totalListings).toBe(0);
+      expect(result.moderation.pendingReviews).toBe(0);
       expect(result.system.notificationsSent).toBe(0);
     });
 
-    it('returns matching pendingListings and pendingReviews counts', async () => {
-      const pendingCount = 7;
-      const dashboard = buildDashboard({
-        listings: buildListingStats({ pendingListings: pendingCount }),
-        moderation: buildModerationStats({ pendingReviews: pendingCount }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
-
-      const result = await service.getDashboard();
-
-      expect(result.listings.pendingListings).toBe(pendingCount);
-      expect(result.moderation.pendingReviews).toBe(pendingCount);
-    });
-
     it('exposes system stats for notifications and audit logs', async () => {
-      const dashboard = buildDashboard({
-        system: buildSystemStats({ notificationsSent: 8400, auditLogsGenerated: 21000 }),
-      });
-      repo.getDashboard.mockResolvedValue(dashboard);
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(
+        buildSystemStats({ notificationsSent: 8400, auditLogsGenerated: 21000 }),
+      );
 
       const result = await service.getDashboard();
 
@@ -156,14 +145,34 @@ describe('AdminDashboardService', () => {
       expect(result.system.auditLogsGenerated).toBe(21000);
     });
 
+    it('calls all four repository methods exactly once', async () => {
+      repo.getListingStats.mockResolvedValue(buildListingStats());
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
+
+      await service.getDashboard();
+
+      expect(repo.getListingStats).toHaveBeenCalledTimes(1);
+      expect(repo.getPlatformUserStats).toHaveBeenCalledTimes(1);
+      expect(repo.getPlatformOrganizationStats).toHaveBeenCalledTimes(1);
+      expect(repo.getPlatformSystemStats).toHaveBeenCalledTimes(1);
+    });
+
     it('re-throws InternalServerErrorException from the repository', async () => {
-      repo.getDashboard.mockRejectedValue(new InternalServerErrorException());
+      repo.getListingStats.mockRejectedValue(new InternalServerErrorException());
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
 
       await expect(service.getDashboard()).rejects.toThrow(InternalServerErrorException);
     });
 
     it('wraps unexpected repository errors in InternalServerErrorException', async () => {
-      repo.getDashboard.mockRejectedValue(new Error('connection lost'));
+      repo.getListingStats.mockRejectedValue(new Error('connection lost'));
+      repo.getPlatformUserStats.mockResolvedValue(buildUserStats());
+      repo.getPlatformOrganizationStats.mockResolvedValue(buildOrganizationStats());
+      repo.getPlatformSystemStats.mockResolvedValue(buildSystemStats());
 
       await expect(service.getDashboard()).rejects.toThrow(InternalServerErrorException);
     });

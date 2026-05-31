@@ -12,6 +12,7 @@ import { ListingMediaModule } from './listing-media/listing-media.module';
 import { ListingSearchModule } from './listing-search/listing-search.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { AdminModule } from './admin/admin.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AdminModule } from './admin/admin.module';
     ListingSearchModule,
     ModerationModule,
     AdminModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

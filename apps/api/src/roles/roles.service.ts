@@ -28,4 +28,14 @@ export class RolesService {
       throw new InternalServerErrorException('Failed to retrieve role');
     }
   }
+
+  async findByName(name: string): Promise<Role | null> {
+    try {
+      return await this.repo.findByName(name);
+    } catch (err) {
+      throw new InternalServerErrorException(`Failed to retrieve role by name: ${name}`, {
+        cause: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  }
 }

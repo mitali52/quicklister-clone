@@ -8,9 +8,19 @@ import { UsersModule } from './users/users.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ListingsModule } from './listings/listings.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ListingMediaModule } from './listing-media/listing-media.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RolesModule, UsersModule, OrganizationsModule, ListingsModule, CategoriesModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    RolesModule,
+    UsersModule,
+    OrganizationsModule,
+    ListingsModule,
+    CategoriesModule,
+    ListingMediaModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

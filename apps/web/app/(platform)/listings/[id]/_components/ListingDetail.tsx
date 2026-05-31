@@ -15,6 +15,7 @@ import {
 } from '../../_hooks/useListings';
 import { ListingForm } from '../../_components/ListingForm';
 import { ListingStatusBadge } from '../../_components/ListingStatusBadge';
+import { ListingMediaManager } from './ListingMediaManager';
 import { LISTING_TYPE_LABELS, PROPERTY_TYPE_LABELS } from '@/lib/schemas/listing.schemas';
 import type { UpdateListing } from '@/lib/schemas/listing.schemas';
 
@@ -322,6 +323,9 @@ export function ListingDetail({ id }: ListingDetailProps) {
               </dl>
             </section>
           )}
+
+          {/* Photos */}
+          <ListingMediaManager listingId={id} isOwner={isOwner} />
 
           {/* Lifecycle actions */}
           <LifecycleActions

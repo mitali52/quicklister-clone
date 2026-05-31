@@ -1,5 +1,4 @@
 import { useAuthStore } from '@/lib/stores/auth.store';
-import type { AuthResponse } from '@/lib/schemas/auth.schemas';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -105,3 +104,31 @@ export const apiPatch = <T>(path: string, body: unknown): Promise<T> =>
   request<T>('PATCH', path, body);
 
 export const apiDelete = <T>(path: string): Promise<T> => request<T>('DELETE', path);
+
+// Multipart file upload — does NOT set Content-Type (browser sets it with the boundary)
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const { accessToken } = useAuthStore.getState();
+  const headers: Record<string, string> = {};
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.ok) {
+    const json: unknown = await res.json();
+    return json as T;
+  }
+
+  const text = await res.text().catch(() => res.statusText);
+  let message: string;
+  try {
+    const parsed = JSON.parse(text) as { message?: string };
+    message = parsed.message ?? text;
+  } catch {
+    message = text;
+  }
+  throw new ApiError(res.status, message);
+}

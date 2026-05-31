@@ -13,6 +13,7 @@ import { type JwtPayload } from './interfaces/jwt-payload.interface';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
 import { verifyPassword } from '../common/helpers/crypto.helper';
+import { decodeJwtKey } from '../common/helpers/jwt-key.helper';
 
 @Injectable()
 export class AuthService {
@@ -95,10 +96,7 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<{ accessToken: string }> {
     try {
-      const publicKey = Buffer.from(
-        process.env.JWT_PUBLIC_KEY ?? '',
-        'base64',
-      ).toString('utf8');
+      const publicKey = decodeJwtKey(process.env.JWT_PUBLIC_KEY);
 
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         algorithms: ['RS256'],
@@ -129,10 +127,7 @@ export class AuthService {
   }
 
   private issueTokens(user: AuthUser): AuthResponseDto {
-    const privateKey = Buffer.from(
-      process.env.JWT_PRIVATE_KEY ?? '',
-      'base64',
-    ).toString('utf8');
+    const privateKey = decodeJwtKey(process.env.JWT_PRIVATE_KEY);
 
     const accessExpiresIn = Number(process.env.JWT_ACCESS_EXPIRES_IN ?? 900);
     const refreshExpiresIn = Number(process.env.JWT_REFRESH_EXPIRES_IN ?? 604800);
@@ -172,10 +167,7 @@ export class AuthService {
   }
 
   private signAccessToken(user: AuthUser): string {
-    const privateKey = Buffer.from(
-      process.env.JWT_PRIVATE_KEY ?? '',
-      'base64',
-    ).toString('utf8');
+    const privateKey = decodeJwtKey(process.env.JWT_PRIVATE_KEY);
 
     const payload: JwtPayload = {
       sub: user.id,

@@ -1,5 +1,5 @@
-import { createHash } from 'crypto';
 import { type Pool } from 'pg';
+import { hashPassword } from '../../common/helpers/crypto.helper';
 
 interface UserSeed {
   email: string;
@@ -33,12 +33,6 @@ const users: UserSeed[] = [
   },
 ];
 
-function hashPassword(password: string): string {
-  // SHA-256 placeholder — replace with bcrypt in the auth module.
-  // Seeders run before the NestJS container starts so we use Node crypto here.
-  return createHash('sha256').update(password).digest('hex');
-}
-
 export async function seedUsers(pool: Pool): Promise<void> {
   for (const user of users) {
     const roleResult = await pool.query<{ id: string }>(
@@ -54,7 +48,7 @@ export async function seedUsers(pool: Pool): Promise<void> {
     }
 
     const password = process.env[user.passwordEnvKey] ?? user.defaultPassword;
-    const passwordHash = hashPassword(password);
+    const passwordHash = await hashPassword(password);
 
     await pool.query(
       `INSERT INTO users (role_id, email, password_hash, full_name, email_verified)

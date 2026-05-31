@@ -14,6 +14,7 @@ import {
 import { type User } from './domain/user';
 import { type CreateUserDto } from './dto/create-user.dto';
 import { type UpdateUserDto } from './dto/update-user.dto';
+import { hashPassword } from '../common/helpers/crypto.helper';
 
 @Injectable()
 export class UsersService {
@@ -42,22 +43,53 @@ export class UsersService {
     }
   }
 
-  async create(_dto: CreateUserDto): Promise<User> {
+  async findByEmail(email: string): Promise<User | null> {
     try {
-      throw new Error('Not implemented');
+      return await this.repo.findByEmail(email);
+    } catch (err) {
+      throw new InternalServerErrorException('Failed to look up user by email', {
+        cause: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  }
+
+  async create(dto: CreateUserDto): Promise<User> {
+    try {
+      const existing = await this.repo.findByEmail(dto.email);
+      if (existing) throw new ConflictException(`Email ${dto.email} is already registered`);
+
+      const passwordHash = await hashPassword(dto.password);
+
+      return await this.repo.create({
+        roleId: dto.roleId,
+        email: dto.email,
+        passwordHash,
+        fullName: dto.fullName,
+        phoneNumber: dto.phoneNumber,
+      });
     } catch (err) {
       if (err instanceof ConflictException) throw err;
       throw new InternalServerErrorException('Failed to create user');
     }
   }
 
-  async update(id: string, _dto: UpdateUserDto): Promise<User> {
+  async update(id: string, dto: UpdateUserDto): Promise<User> {
     try {
       const existing = await this.repo.findById(id);
       if (!existing) throw new NotFoundException(`User ${id} not found`);
-      throw new Error('Not implemented');
+
+      return await this.repo.update(id, {
+        fullName: dto.fullName,
+        phoneNumber: dto.phoneNumber,
+        addressLine1: dto.addressLine1,
+        addressLine2: dto.addressLine2,
+        city: dto.city,
+        county: dto.county,
+        postcode: dto.postcode,
+      });
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
+      if (err instanceof ConflictException) throw err;
       throw new InternalServerErrorException('Failed to update user');
     }
   }
@@ -66,7 +98,8 @@ export class UsersService {
     try {
       const existing = await this.repo.findById(id);
       if (!existing) throw new NotFoundException(`User ${id} not found`);
-      throw new Error('Not implemented');
+
+      await this.repo.softDelete(id);
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       throw new InternalServerErrorException('Failed to delete user');

@@ -14,6 +14,7 @@ import { ModerationModule } from './moderation/moderation.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     AdminModule,
     NotificationsModule,
     AuditLogModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

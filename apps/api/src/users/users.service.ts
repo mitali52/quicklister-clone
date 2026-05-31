@@ -4,6 +4,8 @@ import {
   NotFoundException,
   ConflictException,
   InternalServerErrorException,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   USERS_REPOSITORY,
@@ -14,7 +16,9 @@ import {
 import { type User } from './domain/user';
 import { type CreateUserDto } from './dto/create-user.dto';
 import { type UpdateUserDto } from './dto/update-user.dto';
-import { hashPassword } from '../common/helpers/crypto.helper';
+import { type UpdateProfileDto } from './dto/update-profile.dto';
+import { type ChangePasswordDto } from './dto/change-password.dto';
+import { hashPassword, verifyPassword } from '../common/helpers/crypto.helper';
 
 @Injectable()
 export class UsersService {
@@ -103,6 +107,87 @@ export class UsersService {
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       throw new InternalServerErrorException('Failed to delete user');
+    }
+  }
+
+  // ── Self-service profile methods (authenticated user acting on their own data) ──
+
+  async getProfile(userId: string): Promise<User> {
+    try {
+      const user = await this.repo.findById(userId);
+      if (!user) throw new NotFoundException('User not found');
+      return user;
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new InternalServerErrorException('Failed to retrieve profile');
+    }
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
+    try {
+      const existing = await this.repo.findById(userId);
+      if (!existing) throw new NotFoundException('User not found');
+
+      return await this.repo.update(userId, {
+        fullName: dto.fullName,
+        phoneNumber: dto.phoneNumber,
+        addressLine1: dto.addressLine1,
+        addressLine2: dto.addressLine2,
+        city: dto.city,
+        county: dto.county,
+        postcode: dto.postcode,
+      });
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new InternalServerErrorException('Failed to update profile');
+    }
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
+    try {
+      const existing = await this.repo.findById(userId);
+      if (!existing) throw new NotFoundException('User not found');
+
+      return await this.repo.updateAvatar(userId, avatarUrl);
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new InternalServerErrorException('Failed to update avatar');
+    }
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    try {
+      const user = await this.repo.findById(userId);
+      if (!user) throw new NotFoundException('User not found');
+
+      const isValid = await verifyPassword(dto.currentPassword, user.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+
+      if (dto.currentPassword === dto.newPassword) {
+        throw new BadRequestException('New password must be different from the current password');
+      }
+
+      const newHash = await hashPassword(dto.newPassword);
+      await this.repo.updatePassword(userId, newHash);
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      if (err instanceof UnauthorizedException) throw err;
+      if (err instanceof BadRequestException) throw err;
+      throw new InternalServerErrorException('Failed to change password');
+    }
+  }
+
+  async deleteAccount(userId: string): Promise<void> {
+    try {
+      const existing = await this.repo.findById(userId);
+      if (!existing) throw new NotFoundException('User not found');
+
+      await this.repo.softDelete(userId);
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new InternalServerErrorException('Failed to delete account');
     }
   }
 }

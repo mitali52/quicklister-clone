@@ -16,6 +16,7 @@ interface UserRow {
   password_hash: string;
   full_name: string;
   phone_number: string | null;
+  avatar_url: string | null;
   address_line1: string | null;
   address_line2: string | null;
   city: string | null;
@@ -36,6 +37,7 @@ function toDomain(row: UserRow): User {
     passwordHash: row.password_hash,
     fullName: row.full_name,
     phoneNumber: row.phone_number,
+    avatarUrl: row.avatar_url,
     addressLine1: row.address_line1,
     addressLine2: row.address_line2,
     city: row.city,
@@ -154,6 +156,40 @@ export class UsersRepository implements IUsersRepository {
         return toDomain(row);
       } catch (err) {
         handleDbError(err, 'UsersRepository.update');
+      }
+    });
+  }
+
+  async updateAvatar(id: string, avatarUrl: string): Promise<User> {
+    return transaction(this.pool, async (client: PoolClient) => {
+      try {
+        const result = await client.query<UserRow>(
+          `UPDATE users
+           SET avatar_url = $1, updated_at = NOW()
+           WHERE id = $2 AND deleted_at IS NULL
+           RETURNING *`,
+          [avatarUrl, id],
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error('Update returned no row');
+        return toDomain(row);
+      } catch (err) {
+        handleDbError(err, 'UsersRepository.updateAvatar');
+      }
+    });
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    return transaction(this.pool, async (client: PoolClient) => {
+      try {
+        await client.query(
+          `UPDATE users
+           SET password_hash = $1, updated_at = NOW()
+           WHERE id = $2 AND deleted_at IS NULL`,
+          [passwordHash, id],
+        );
+      } catch (err) {
+        handleDbError(err, 'UsersRepository.updatePassword');
       }
     });
   }

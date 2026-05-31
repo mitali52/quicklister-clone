@@ -18,6 +18,8 @@ export interface IUsersRepository {
   findByEmail(email: string): Promise<User | null>;
   create(data: CreateUserData): Promise<User>;
   update(id: string, data: UpdateUserData): Promise<User>;
+  updateAvatar(id: string, avatarUrl: string): Promise<User>;
+  updatePassword(id: string, passwordHash: string): Promise<void>;
   softDelete(id: string): Promise<void>;
 }
 

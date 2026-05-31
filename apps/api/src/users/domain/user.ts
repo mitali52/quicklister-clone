@@ -5,6 +5,7 @@ export interface User {
   passwordHash: string;
   fullName: string;
   phoneNumber: string | null;
+  avatarUrl: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
   city: string | null;
@@ -28,6 +29,7 @@ export interface CreateUserData {
 export interface UpdateUserData {
   fullName?: string;
   phoneNumber?: string;
+  avatarUrl?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;

@@ -1,4 +1,4 @@
-import { randomBytes, scrypt, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 
 const scryptAsync = promisify(scrypt);
@@ -12,6 +12,12 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  // Backward compatibility for legacy seeded accounts that used plain SHA-256 hashes.
+  if (!stored.includes(':')) {
+    const legacyHash = createHash('sha256').update(password).digest('hex');
+    return timingSafeEqual(Buffer.from(legacyHash, 'hex'), Buffer.from(stored, 'hex'));
+  }
+
   const [salt, hash] = stored.split(':');
   if (!salt || !hash) return false;
   const hashBuffer = Buffer.from(hash, 'hex');

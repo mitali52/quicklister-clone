@@ -13,6 +13,7 @@ import { ListingSearchModule } from './listing-search/listing-search.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ModerationModule,
     AdminModule,
     NotificationsModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

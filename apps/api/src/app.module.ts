@@ -9,6 +9,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { ListingsModule } from './listings/listings.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ListingMediaModule } from './listing-media/listing-media.module';
+import { ListingSearchModule } from './listing-search/listing-search.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ListingMediaModule } from './listing-media/listing-media.module';
     ListingsModule,
     CategoriesModule,
     ListingMediaModule,
+    ListingSearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],

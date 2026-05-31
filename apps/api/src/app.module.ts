@@ -10,6 +10,7 @@ import { ListingsModule } from './listings/listings.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ListingMediaModule } from './listing-media/listing-media.module';
 import { ListingSearchModule } from './listing-search/listing-search.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ListingSearchModule } from './listing-search/listing-search.module';
     CategoriesModule,
     ListingMediaModule,
     ListingSearchModule,
+    ModerationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

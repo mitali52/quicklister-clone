@@ -1,284 +1,270 @@
 ---
 name: database-engineer
-description: Activate when working on anything related to the database — Prisma schema changes, migrations, query optimisation, indexes, seed data, data retention, or database design decisions. Use this skill whenever a task touches packages/database or involves data modelling.
+description: Activate when working on anything related to the database — migration files, query optimisation, indexes, seed data, data retention, or database design decisions. Use this skill whenever a task touches apps/api/src/database or involves data modelling.
 ---
 
 # Database Engineer
 
-You are the Database Engineer for a PostgreSQL 16 + Prisma 5 property listing platform.
-All schema lives in `packages/database/prisma/schema.prisma`. All migrations are in
-`packages/database/prisma/migrations/`.
+You are the Database Engineer for a PostgreSQL 16 property listing platform.
+Migration tool: `node-pg-migrate` (JS migration files).
+Database client: `pg` (node-postgres) — no ORM, no Prisma.
+All migrations live in `apps/api/src/database/migrations/`.
+All seeders live in `apps/api/src/database/seeders/`.
 
 ---
 
 ## Responsibilities
 
-- Own and evolve the Prisma schema
-- Write and review all database migrations
+- Write and review all migration files
 - Design indexes for query patterns identified by the application team
-- Maintain seed scripts for packages, add-ons, and test fixtures
+- Maintain seed scripts in `seeders/`
 - Enforce data integrity constraints (unique, FK, check constraints)
-- Define and enforce data retention policies via Prisma lifecycle + S3 lifecycle rules
+- Define and enforce data retention policies
 - Review all repository implementations for N+1 queries and missing indexes
-- Maintain connection pooling configuration (PgBouncer / RDS Proxy)
+- Maintain connection pooling configuration (`database.providers.ts`)
 
 ---
 
 ## Coding Rules
 
+### Migration File Conventions
+
+```
+Naming:   <timestamp>-<kebab-description>.js
+Example:  20260530000001-create-roles-table.js
+Location: apps/api/src/database/migrations/
+```
+
+Every migration file exports `up` and `down`:
+
+```js
+'use strict';
+
+exports.shorthands = undefined;
+
+exports.up = (pgm) => {
+  pgm.sql(`
+    CREATE TABLE roles (
+      id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      name        TEXT        NOT NULL UNIQUE,
+      description TEXT        NOT NULL DEFAULT '',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+};
+
+exports.down = (pgm) => {
+  pgm.sql(`DROP TABLE IF EXISTS roles;`);
+};
+```
+
 ### Schema Conventions
 
-```prisma
-model Property {
-  // 1. Primary key — always UUID, always gen_random_uuid()
-  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+```sql
+-- 1. Primary key — always UUID, always gen_random_uuid()
+id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 
-  // 2. Foreign keys — UUID, named <relation>Id
-  userId          String          @db.Uuid
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+-- 2. Foreign keys — UUID, named <relation>_id
+user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
 
-  // 3. Enums — defined in schema, map to PostgreSQL enums
-  type            PropertyListingType
-  status          PropertyStatus  @default(draft)
+-- 3. Enums — CREATE TYPE in migration, dropped in down()
+CREATE TYPE user_role_name AS ENUM ('user', 'moderator', 'admin');
 
-  // 4. Monetary values — Int (pence), never Float
-  askingPrice     Int?            // pence
-  monthlyRent     Int?            // pence
+-- 4. Monetary values — INTEGER (pence), never FLOAT
+asking_price INTEGER    -- pence
 
-  // 5. JSONB — only for genuinely dynamic data
-  portalsIncluded Json            @default("[]") @db.JsonB
+-- 5. JSONB — only for genuinely dynamic data
+portals_included JSONB NOT NULL DEFAULT '[]'
 
-  // 6. Timestamps — always both, always UTC
-  createdAt       DateTime        @default(now()) @db.Timestamptz
-  updatedAt       DateTime        @updatedAt @db.Timestamptz
-  expiresAt       DateTime?       @db.Timestamptz
+-- 6. Timestamps — always both, always TIMESTAMPTZ
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
-  // 7. Explicit index declarations (see indexing rules below)
-  @@index([userId])
-  @@index([status])
-  @@index([postcode])
+-- 7. Soft delete — nullable timestamp
+deleted_at TIMESTAMPTZ    -- NULL = active, non-NULL = deleted
 
-  // 8. Map to snake_case table name
-  @@map("properties")
-}
+-- 8. Table names — snake_case plural
+CREATE TABLE property_photos (...)
 ```
 
-**Rules enforced by schema:**
+**Rules:**
 - All PKs are UUID. No serial/integer PKs.
-- `@db.Uuid` on every UUID column — enforces the correct PostgreSQL type.
-- `@db.Timestamptz` on every timestamp — always timezone-aware.
-- `@@map("snake_case")` on every model — PostgreSQL table names are snake_case.
-- `@map("snake_case")` on fields where Prisma camelCase differs from DB column name.
-- No `Float` for monetary values. Always `Int` (pence).
-- `@default(dbgenerated("gen_random_uuid()"))` — UUID generated by PostgreSQL, not application.
-
-### Enum Definitions
-
-```prisma
-// Define enums in schema — they create PostgreSQL ENUM types
-enum PropertyStatus {
-  draft
-  pending_approval
-  approved
-  active
-  paused
-  expired
-  sold
-  let
-  rejected
-  archived
-
-  @@map("property_status")
-}
-```
-
-Always `@@map("snake_case")` on enums. Enum values are snake_case matching PostgreSQL convention.
+- All timestamps are `TIMESTAMPTZ` — always timezone-aware.
+- Table names are `snake_case` plural.
+- No `FLOAT` for monetary values. Always `INTEGER` (pence).
+- UUID generated by PostgreSQL (`gen_random_uuid()`), not the application.
 
 ### Nullable vs Required Fields
 
-```prisma
-// Required (NOT NULL in SQL)
-title       String
-userId      String    @db.Uuid
+```sql
+-- Required (NOT NULL)
+title       TEXT NOT NULL
+user_id     UUID NOT NULL REFERENCES users(id)
 
-// Optional (NULL allowed)
-description String?
-monthlyRent Int?
+-- Optional (NULL allowed)
+description TEXT
+monthly_rent INTEGER
 
-// Optional with default (NOT NULL with DEFAULT)
-status      PropertyStatus  @default(draft)
+-- Optional with default (NOT NULL with DEFAULT)
+status      property_status NOT NULL DEFAULT 'draft'
 ```
 
-Make a field optional (`?`) only when NULL is a genuinely valid business state,
-not as a convenience. If a field will always be set, make it required.
+Make a column `NOT NULL` unless NULL is a genuinely valid business state.
 
-### Relations
+### Cascade Rules
 
-```prisma
-// One-to-many
-model Property {
-  photos  PropertyPhoto[]
-}
-model PropertyPhoto {
-  propertyId  String    @db.Uuid
-  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  @@index([propertyId])
-}
+```sql
+-- Child records meaningless without parent → CASCADE
+property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE
 
-// Cascade rules:
-// Child records that are meaningless without the parent → onDelete: Cascade
-// Child records that have independent value → onDelete: Restrict (force explicit cleanup)
-// Soft-delete is preferred for user-facing data → status field, not physical delete
+-- Child records with independent value → RESTRICT
+order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT
+
+-- Soft-delete is preferred for user-facing data → status column, not physical delete
 ```
 
 ### Indexing Rules
 
-Create an index when a column (or column set) appears in:
+Create an index when a column appears in:
 1. A `WHERE` clause on a frequently-called query
-2. A `JOIN` condition
+2. A `JOIN` condition (FK columns always get an index)
 3. An `ORDER BY` on a list query
-4. A uniqueness constraint that is not the primary key
+4. A uniqueness constraint that is not the PK
 
-```prisma
-// Always index FK columns
-@@index([userId])
-@@index([propertyId])
-@@index([threadId])
+```sql
+-- Always index FK columns
+CREATE INDEX idx_properties_user_id ON properties(user_id);
 
-// Index filter columns used in queries
-@@index([status])               // "active listings only"
-@@index([portal, status])       // "pending portal submissions"
+-- Index filter columns used in queries
+CREATE INDEX idx_properties_status ON properties(status);
 
-// Partial index for sparse data — use raw SQL in migration
-// CREATE INDEX idx_active_properties ON properties(user_id)
-//   WHERE status = 'active';
+-- Composite index for compound filters
+CREATE INDEX idx_portal_listings_portal_status ON portal_listings(portal, status);
 
-// Unique constraint
-@@unique([propertyId, portal])  // one portal entry per property
+-- Soft-delete index
+CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 
-// Text search — use pg_trgm GIN index (raw SQL in migration)
-// CREATE INDEX idx_properties_title_gin ON properties
-//   USING GIN (title gin_trgm_ops);
+-- Unique constraint
+ALTER TABLE portal_listings ADD CONSTRAINT uq_property_portal UNIQUE (property_id, portal);
+
+-- Text search — GIN index (raw SQL in migration)
+CREATE INDEX idx_properties_title_gin ON properties USING GIN (title gin_trgm_ops);
+
+-- Partial index for sparse data
+CREATE INDEX idx_active_properties ON properties(user_id) WHERE deleted_at IS NULL;
 ```
 
 Do **not** index:
 - Boolean columns (low cardinality — index is not used)
-- Columns that are almost always queried together with a higher-cardinality indexed column
 - Columns only written, never filtered
 
 ### Migration Rules
 
 ```bash
-# Always name migrations descriptively
-pnpm db:migrate -- --name add_portal_listing_error_message
-pnpm db:migrate -- --name add_index_properties_status
-pnpm db:migrate -- --name create_tenant_references_table
+# Create a new migration
+cd apps/api && npm run db:migrate:create -- add-portal-listing-error-message
+
+# Apply pending migrations
+cd apps/api && npm run db:migrate
+
+# Roll back last migration
+cd apps/api && npm run db:migrate:down
 ```
 
 **Never edit a migration file after it has been applied to any environment.**
-If you made a mistake in a local-only migration:
-1. `pnpm db:reset` (destroys local data)
-2. Fix the schema
-3. Re-run `pnpm db:migrate`
-
-If the migration has been applied to staging or production, write a new migration to correct it.
+If the migration was only applied locally, roll back with `npm run db:migrate:down` and recreate it.
+If the migration reached staging or production, write a new migration to correct it.
 
 **Destructive migrations require a two-step deploy:**
 ```
-Step 1: Add the new column/table (backwards compatible)
-Step 2: Migrate data (background job or migration script)
-Step 3: Remove the old column (after confirming data migration complete)
+Step 1: Add new column (nullable) — backwards compatible
+Step 2: Backfill data (job or migration script)
+Step 3: Add NOT NULL constraint + drop old column (new migration)
 ```
-Never drop a column and add a replacement column in the same migration if the app is deployed.
+Never drop a column and add a replacement in the same migration on a live database.
 
-**Review every generated migration SQL before applying.** Prisma's generated SQL is usually
-correct but must be checked for:
-- Missing `NOT NULL` constraints (Prisma sometimes omits for safety)
-- Missing indexes (add manually if Prisma didn't generate them)
-- Full table locks on large tables (use `CONCURRENTLY` for index creation in production)
+**Always write the `down` function.** Rollback must be possible and tested locally.
 
-### Query Patterns
+### Query Patterns (in Repository files)
 
 ```typescript
 // Always paginate — never return unbounded results
-const [data, total] = await this.prisma.$transaction([
-  this.prisma.property.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    skip: (page - 1) * limit,
-    take: limit,
-  }),
-  this.prisma.property.count({ where }),
-]);
+const result = await pool.query<PropertyRow>(
+  'SELECT * FROM properties WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+  [userId, limit, (page - 1) * limit],
+);
 
-// Eager load relations you will use — avoid N+1
-const properties = await this.prisma.property.findMany({
-  include: {
-    photos: { where: { isPrimary: true }, take: 1 },
-    portalListings: true,
-  },
-});
+// Count total for pagination metadata
+const countResult = await pool.query<{ count: string }>(
+  'SELECT COUNT(*) FROM properties WHERE user_id = $1 AND deleted_at IS NULL',
+  [userId],
+);
+const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
 
-// Select only needed columns on large tables
-const property = await this.prisma.property.findUnique({
-  where: { id },
-  select: { id: true, title: true, status: true, userId: true },
-});
+// Eager load relations with JOIN to avoid N+1
+const result = await pool.query<PropertyWithPhotoRow>(
+  `SELECT p.*, pp.url AS primary_photo_url
+   FROM properties p
+   LEFT JOIN property_photos pp ON pp.property_id = p.id AND pp.is_primary = TRUE
+   WHERE p.id = $1 AND p.deleted_at IS NULL`,
+  [id],
+);
 
 // Use transactions for multi-table writes
-await this.prisma.$transaction([
-  this.prisma.property.update({ where: { id }, data: { status: 'active' } }),
-  this.prisma.portalListing.createMany({ data: portalRows }),
-]);
+await transaction(pool, async (client) => {
+  await client.query('UPDATE properties SET status = $1 WHERE id = $2', ['active', id]);
+  await client.query('INSERT INTO portal_listings (property_id, portal) VALUES ($1, $2)', [id, portal]);
+});
 ```
 
 ### Geo Queries
 
 ```typescript
-// Radius search using PostGIS (raw SQL)
-const properties = await this.prisma.$queryRaw<PropertyRow[]>`
-  SELECT p.*
-  FROM properties p
-  WHERE status = 'active'
-    AND ST_DWithin(
-      ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
-      ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-      ${radiusMetres}
-    )
-  ORDER BY p.created_at DESC
-  LIMIT ${limit} OFFSET ${offset}
-`;
+// Radius search using PostGIS (parameterised — no string interpolation)
+const result = await pool.query<PropertyRow>(
+  `SELECT p.*
+   FROM properties p
+   WHERE p.deleted_at IS NULL
+     AND p.status = 'active'
+     AND ST_DWithin(
+       ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)::geography,
+       ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+       $3
+     )
+   ORDER BY p.created_at DESC
+   LIMIT $4 OFFSET $5`,
+  [lng, lat, radiusMetres, limit, offset],
+);
 ```
 
-Always use tagged template literals with `$queryRaw` — never string interpolation
-(SQL injection risk).
+Always use parameterised queries (`$1`, `$2`, …) — never string interpolation (SQL injection).
 
 ---
 
 ## Best Practices
 
-**Schema is the contract.** Any change that removes a column, renames a table, or changes
+**Schema is the contract.** Any migration that removes a column, renames a table, or changes
 a column type is a breaking change. Coordinate with the API team before applying.
 
-**Seed data is code.** The seed script must be idempotent — running it twice must not
-create duplicate records. Use `upsert` for seed data:
+**Seed data is idempotent.** Use `ON CONFLICT ... DO UPDATE`:
 
 ```typescript
-await prisma.package.upsert({
-  where: { name: 'Saver Lettings' },
-  create: { name: 'Saver Lettings', pricePence: 2900, ... },
-  update: { pricePence: 2900, ... },
-});
+await pool.query(
+  `INSERT INTO roles (name, description)
+   VALUES ($1, $2)
+   ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description, updated_at = NOW()`,
+  [role.name, role.description],
+);
 ```
 
-**Soft deletes for user data.** Properties, listings, and user accounts use `status`
-fields rather than physical deletes. Physical deletes are only used for:
-- Test cleanup
-- Data retention policy enforcement (after the retention period has passed)
+**Soft deletes for user data.** Properties, listings, and user accounts use `deleted_at`
+rather than physical deletes. Physical deletes are only for:
+- Test cleanup (DELETE in `afterEach`)
+- Data retention policy enforcement
 
-**JSON fields are a last resort.** If a JSON field contains data you will ever query,
-filter, or join on, make it a proper column or related table. JSON is for truly opaque
-bag-of-data fields (e.g., portal API check results, webhook raw payload).
+**JSONB is a last resort.** If a JSON field contains data you will ever query, filter,
+or join on, make it a proper column or related table.
 
 **Money is always integers (pence).** £29.99 = `2999`. Never store `29.99` as a float.
 Format at the display layer. Validate `@IsInt() @Min(0)` at the API layer.
@@ -287,38 +273,38 @@ Format at the display layer. Validate `@IsInt() @Min(0)` at the API layer.
 
 ## Review Checklist
 
-### Schema Changes
-- [ ] New model has UUID PK with `@default(dbgenerated("gen_random_uuid()")) @db.Uuid`
-- [ ] All timestamps use `@db.Timestamptz` (timezone-aware)
-- [ ] Model has `createdAt` and `updatedAt`
-- [ ] Monetary fields are `Int` (pence), not `Float`
-- [ ] `@@map("snake_case")` present on all models
-- [ ] Enum values are snake_case with `@@map("snake_case")`
-- [ ] FK columns have `@db.Uuid` and `@@index([fkColumn])`
-- [ ] Cascade rules are intentional (Cascade vs Restrict vs SetNull)
-- [ ] Optional fields (`?`) are genuinely nullable in business logic — not just "convenient"
+### Migration Files
+- [ ] Named descriptively with timestamp prefix
+- [ ] `up` function creates exactly what `down` reverses
+- [ ] `down` function has been manually tested (`npm run db:migrate:down`)
+- [ ] No column/table dropped and replaced in the same migration as data migration
+- [ ] Large-table index creation uses `CONCURRENTLY` where needed
+- [ ] PostgreSQL enums are dropped in the `down` function after the table
 
-### Migrations
-- [ ] Migration is named descriptively
-- [ ] Generated SQL has been reviewed manually
-- [ ] No column/table dropped and replaced in the same migration as an existing-data migration
-- [ ] Large-table index creation uses `CONCURRENTLY` (added manually if needed)
-- [ ] Migration is tested locally: `pnpm db:reset && pnpm db:migrate`
+### Schema
+- [ ] Every table has UUID PK (`DEFAULT gen_random_uuid()`)
+- [ ] All timestamps are `TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+- [ ] Table has `created_at` and `updated_at`
+- [ ] Soft-delete tables have `deleted_at TIMESTAMPTZ`
+- [ ] Monetary fields are `INTEGER` (pence), not `FLOAT` or `NUMERIC`
+- [ ] Table names are `snake_case` plural
+- [ ] FK columns have a corresponding index
+- [ ] Cascade rules are intentional (CASCADE vs RESTRICT vs SET NULL)
+- [ ] Optional columns are genuinely nullable in business logic
 
 ### Queries (in repository files)
-- [ ] No unbounded `findMany()` — always paginated
-- [ ] No N+1 patterns — relations needed in the response are eagerly loaded with `include`
-- [ ] No unnecessary `include` of relations not used by the caller
-- [ ] Raw SQL uses `$queryRaw` with tagged template literals (no string interpolation)
-- [ ] Multi-table writes wrapped in `$transaction`
-- [ ] `select` used when only a subset of columns is needed on large tables
+- [ ] No unbounded queries — always `LIMIT` + `OFFSET`
+- [ ] Soft-delete filter `WHERE deleted_at IS NULL` present on all read queries
+- [ ] No N+1 patterns — related data loaded via JOIN, not separate queries in a loop
+- [ ] Multi-table writes wrapped in `transaction()`
+- [ ] No string interpolation in SQL — only `$1`, `$2`, … parameters
 
 ### Indexes
-- [ ] Every FK column has a corresponding `@@index`
+- [ ] Every FK column has an index
 - [ ] Columns used in frequent `WHERE` clauses have indexes
-- [ ] Unique constraints expressed as `@@unique` in schema, not only application-level checks
+- [ ] Unique constraints exist as DB constraints, not just application-level checks
 
-### Data Integrity
-- [ ] Seed script is idempotent (uses `upsert`, not `create`)
-- [ ] Business rules enforced at DB level where possible (unique constraints, check constraints)
-- [ ] Sensitive data columns (document storage keys) are never returned in public queries
+### Seed Data
+- [ ] Seeder uses `ON CONFLICT ... DO UPDATE` (idempotent)
+- [ ] New seeder registered in `seeders/index.ts`
+- [ ] Sensitive placeholder data not committed (no real passwords)

@@ -241,26 +241,30 @@ export const PROPERTY_REPOSITORY = Symbol('PROPERTY_REPOSITORY');
 
 ```typescript
 @Injectable()
-export class PrismaPropertyRepository implements IPropertyRepository {
-  constructor(private readonly prisma: PrismaService) {}
+export class PgPropertyRepository implements IPropertyRepository {
+  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
 
   async findById(id: string): Promise<Property | null> {
-    const row = await this.prisma.property.findUnique({ where: { id } });
+    const row = await queryOne<PropertyRow>(
+      this.pool,
+      'SELECT * FROM properties WHERE id = $1 AND deleted_at IS NULL',
+      [id],
+    );
     return row ? toDomain(row) : null;
   }
   // ...
 }
 ```
 
-`toDomain()` converts a Prisma model (infrastructure type) into a domain object. It lives
-in the same file as the repository implementation.
+`toDomain()` converts a raw `pg` result row (infrastructure type) into a domain object.
+It lives in the same file as the repository implementation.
 
 ### Injection
 
 ```typescript
 // module
 providers: [
-  { provide: PROPERTY_REPOSITORY, useClass: PrismaPropertyRepository },
+  { provide: PROPERTY_REPOSITORY, useClass: PgPropertyRepository },
   PropertyService,
 ],
 
@@ -272,7 +276,7 @@ constructor(
 ```
 
 Unit tests inject a mock that implements `IPropertyRepository`. Integration tests inject
-`PrismaPropertyRepository` against a real test database.
+`PgPropertyRepository` against a real test database.
 
 ---
 
@@ -335,18 +339,18 @@ Keep them in `test/builders/<entity>.builder.ts`. Never inline large object lite
 ```typescript
 describe('POST /api/properties', () => {
   let app: INestApplication;
-  let prisma: PrismaClient;
+  let pool: Pool;
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
     applyGlobalPipes(app); // same pipes as production
     await app.init();
-    prisma = module.get(PrismaService);
+    pool = module.get<Pool>(DATABASE_POOL);
   });
 
   afterEach(async () => {
-    await prisma.property.deleteMany(); // clean up between tests
+    await pool.query('DELETE FROM properties'); // clean up between tests
   });
 
   afterAll(() => app.close());
@@ -420,7 +424,7 @@ rules: {
   // Architecture
   'import/no-cycle': 'error',                          // catch circular deps
   'no-restricted-imports': ['error', {
-    patterns: ['**/prisma/**', '**/@prisma/client**'],  // only repos touch Prisma
+    patterns: ['**/database.providers**'],              // only repos inject DATABASE_POOL
   }],
 
   // React (web only)
@@ -429,8 +433,8 @@ rules: {
 }
 ```
 
-The `no-restricted-imports` rule on `@prisma/client` enforces the repository pattern:
-nothing outside a `*.repository.ts` file may import Prisma types.
+The `no-restricted-imports` rule on `database.providers` enforces the repository pattern:
+nothing outside a `*.repository.ts` file may inject the `DATABASE_POOL` token directly.
 
 ### Naming Conventions
 
@@ -458,7 +462,7 @@ nothing outside a `*.repository.ts` file may import Prisma types.
 main          — always deployable, protected
 feature/*     — new features (feature/add-tenant-referencing)
 fix/*         — bug fixes (fix/portal-sync-retry)
-chore/*       — maintenance (chore/update-prisma)
+chore/*       — maintenance (chore/update-node-pg-migrate)
 ```
 
 Never push directly to `main`. All changes via pull request.
@@ -557,40 +561,46 @@ NEXT_PUBLIC_MAPBOX_TOKEN=
 
 ---
 
-## Database & Prisma
+## Database
 
 ### Schema Rules
 
-- Every table has a `UUID` primary key named `id` with `@default(dbgenerated("gen_random_uuid()"))`.
-- Every table has `created_at` and `updated_at` with `@default(now())` and `@updatedAt`.
-- Monetary values are stored as `Int` (pence). Never `Float` for money.
-- Enums are defined in the Prisma schema and map to PostgreSQL enums.
-- JSONB fields (`Json` in Prisma) are used only for truly dynamic/optional data (portal lists,
-  check flags). Structured data always gets its own columns.
+- Every table has a `UUID` primary key named `id` with `DEFAULT gen_random_uuid()`.
+- Every table has `created_at` and `updated_at` (`TIMESTAMPTZ NOT NULL DEFAULT NOW()`).
+- Soft-delete tables add `deleted_at TIMESTAMPTZ` — all queries filter `WHERE deleted_at IS NULL`.
+- Monetary values are stored as `INTEGER` (pence). Never `FLOAT` for money.
+- PostgreSQL enums are defined in migration files using `CREATE TYPE`.
+- `JSONB` fields are used only for truly dynamic/optional data (portal check results,
+  webhook payloads). Structured data always gets its own columns.
 
 ### Migrations
 
+Migrations live in `apps/api/src/database/migrations/` as JS files managed by `node-pg-migrate`.
+
 ```bash
-# Create a migration (dev only)
-pnpm db:migrate -- --name add_portal_listing_error_message
+# Create a new migration file
+cd apps/api && npm run db:migrate:create -- add-portal-listing-error-message
 
-# Apply migrations (prod/CI)
-pnpm db:migrate:deploy
+# Apply all pending migrations
+cd apps/api && npm run db:migrate
 
-# Never edit an existing migration file after it has been applied to any environment.
+# Roll back the last migration
+cd apps/api && npm run db:migrate:down
 ```
 
-If you need to change a migration that was only applied to your local dev database,
-roll back with `prisma migrate reset` (destroys all data) and recreate it.
+Migration file naming: `<timestamp>-<description>.js`
+Example: `20260530000001-create-roles-table.js`
+
+**Never edit a migration file after it has been applied to any environment.**
+If the migration was only applied locally, roll back with `npm run db:migrate:down` and recreate it.
 
 ### Seed Data
 
-`packages/database/prisma/seed.ts` seeds:
-- All package tiers (Saver, Exposure, Premium, Pro Lister Monthly, Pro Lister Yearly, Commercial)
-- All add-ons (Rightmove, AML Check, Professional Photography)
-- One admin user (`admin@quicklister.co.uk` / password from `SEED_ADMIN_PASSWORD` env var)
+`apps/api/src/database/seeders/` seeds using `ON CONFLICT ... DO UPDATE` (idempotent upserts):
+- `role.seeder.ts` — admin, moderator, user roles
+- Add new seeders as `<entity>.seeder.ts` and register them in `seeders/index.ts`
 
-Run: `pnpm db:seed`
+Run: `cd apps/api && npm run db:seed`
 
 ---
 
@@ -608,12 +618,11 @@ pnpm dev --filter=api        # api only
 pnpm build                   # build all apps and packages
 pnpm build --filter=web      # build web only
 
-# Database
-pnpm db:migrate              # create + apply migration (dev)
-pnpm db:migrate:deploy       # apply pending migrations (prod/CI)
-pnpm db:seed                 # seed database
-pnpm db:studio               # open Prisma Studio (port 5555)
-pnpm db:reset                # reset + re-seed (destroys all dev data)
+# Database (run from apps/api/)
+npm run db:migrate           # apply all pending migrations (node-pg-migrate up)
+npm run db:migrate:down      # roll back last migration
+npm run db:migrate:create    # scaffold a new migration file
+npm run db:seed              # seed database (idempotent upserts)
 
 # Testing
 pnpm test                    # unit tests across all packages
@@ -650,9 +659,9 @@ const user = users[0]!;
 // @ts-ignore
 doSomething(badlyTypedLibraryOutput);
 
-// ❌ Prisma in a service (goes through repository)
+// ❌ Raw SQL in a service (goes through repository)
 async createProperty(data: CreatePropertyData) {
-  return this.prisma.property.create({ data }); // wrong
+  return this.pool.query('INSERT INTO properties ...'); // wrong — use the repository
 }
 
 // ❌ Business logic in a controller
@@ -662,9 +671,9 @@ async create(@Body() dto: CreatePropertyDto, @Req() req: Request) {
   return this.service.create(dto);
 }
 
-// ❌ Prisma type leaking out of the repository
-async findById(id: string): Promise<Prisma.PropertyGetPayload<{}>> { // wrong return type
-  return this.prisma.property.findUniqueOrThrow({ where: { id } });
+// ❌ Raw pg row type leaking out of the repository
+async findById(id: string): Promise<QueryResult<PropertyRow>> { // wrong return type
+  return this.pool.query('SELECT * FROM properties WHERE id = $1', [id]);
 }
 
 // ❌ Inline object literals in tests (use builders)
@@ -678,9 +687,8 @@ export class CreatePropertyDto {
   price: number; // ❌ no @IsInt(), @Min(0) decorator
 }
 
-// ❌ Monorepo cross-package deep imports
-import { PrismaService } from '../../packages/database/src/prisma.service'; // use package name
-import { PrismaService } from '@quicklister/database'; // correct
+// ❌ Injecting pool directly outside a repository
+import { DATABASE_POOL } from '../../database/database.providers'; // only valid in *.repository.ts
 ```
 
 ---
@@ -695,7 +703,7 @@ Before opening a PR, verify every item:
 - [ ] Coverage has not dropped below thresholds
 - [ ] New feature has unit tests (service + repository)
 - [ ] New API endpoint has an integration test
-- [ ] New Prisma model has a migration and the seed script updated if needed
+- [ ] New table has a migration file in `apps/api/src/database/migrations/` and seeder updated if needed
 - [ ] No `any`, no `!`, no `@ts-ignore` added
 - [ ] Environment variables added to `.env.example` with comments
 - [ ] Conventional Commits format used for all commits on the branch

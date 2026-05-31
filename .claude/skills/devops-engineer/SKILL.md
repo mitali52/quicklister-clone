@@ -138,7 +138,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter=@quicklister/database db:migrate:deploy
+      - run: cd apps/api && npm run db:migrate
       - run: pnpm turbo test:integration
 ```
 
@@ -232,7 +232,6 @@ RUN npm install -g pnpm@9
 # Install dependencies (cached layer)
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/
-COPY packages/database/package.json packages/database/
 COPY packages/types/package.json packages/types/
 RUN pnpm install --frozen-lockfile
 
@@ -248,7 +247,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/database/prisma ./prisma
+COPY --from=builder /app/apps/api/src/database/migrations ./migrations
 
 USER appuser
 EXPOSE 4000
@@ -264,7 +263,7 @@ CMD ["node", "dist/main.js"]
 - `HEALTHCHECK` required — ECS uses it to determine task health.
 - Layer caching: copy `package.json` files and run `pnpm install` before copying source.
   Source changes don't invalidate the dependency layer.
-- Copy `prisma/` schema so `prisma migrate deploy` can run in the container.
+- Copy `migrations/` folder so `node-pg-migrate` can run inside the container.
 
 ### Husky + lint-staged
 

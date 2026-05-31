@@ -277,7 +277,7 @@ Steps:
   2. Configure AWS credentials (OIDC — no long-lived keys)
   3. Build Docker image: docker build -t quicklister/api .
   4. Push to ECR: docker push {ECR_URL}/quicklister/api:latest
-  5. Run DB migrations: prisma migrate deploy
+  5. Run DB migrations: npm run db:migrate (via ECS run-task)
      (connects to RDS via bastion or ECS task)
   6. Update ECS service: aws ecs update-service --force-new-deployment
   7. Wait for deployment stable: aws ecs wait services-stable
@@ -288,7 +288,7 @@ Steps:
 Trigger: manually dispatched or called by deploy-api.yml
 
 Steps:
-  1. Run prisma migrate deploy via ECS run-task
+  1. Run node-pg-migrate via ECS run-task
      (uses same VPC — can reach RDS in private subnet)
   2. Report success or failure to GitHub
 ```
@@ -315,9 +315,10 @@ docker-compose.yml services:
 
 Root commands (via turbo):
   pnpm dev          → starts web (port 3000) + api (port 4000) concurrently
-  pnpm db:migrate   → prisma migrate dev
-  pnpm db:seed      → prisma db seed
-  pnpm db:studio    → prisma studio (port 5555)
+  npm run db:migrate         → node-pg-migrate up (runs pending migrations)
+  npm run db:migrate:down    → node-pg-migrate down (rolls back last migration)
+  npm run db:migrate:create  → scaffold new migration file
+  npm run db:seed            → ts-node src/database/seeders/index.ts
   pnpm build        → production build (both apps)
   pnpm test         → run all tests
 ```
@@ -328,7 +329,7 @@ Environment files:
 .env.local                      → gitignored, developer machine
 apps/web/.env.local             → Next.js env (NEXT_PUBLIC_*)
 apps/api/.env                   → NestJS env
-packages/database/.env          → DATABASE_URL for Prisma CLI
+apps/api/.env                   → DATABASE_URL for node-pg-migrate and pg Pool
 ```
 
 ---

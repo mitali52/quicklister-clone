@@ -6,12 +6,21 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { ForgotPasswordSchema, type ForgotPassword } from '@/lib/schemas/auth.schemas';
 import { FormField } from '@/components/ui/FormField';
+import { requestPasswordResetApi } from '@/lib/api/auth.api';
+import { ApiError } from '@/lib/api/client';
+
+type ResetResult = {
+  message: string;
+  resetLink: string | null;
+};
 
 type FormState = 'idle' | 'submitting' | 'sent';
 
 export function ForgotPasswordForm() {
   const [state, setState] = useState<FormState>('idle');
   const [submittedEmail, setSubmittedEmail] = useState('');
+  const [resetResult, setResetResult] = useState<ResetResult | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -23,10 +32,20 @@ export function ForgotPasswordForm() {
 
   async function onSubmit(data: ForgotPassword) {
     setState('submitting');
+    setFormError(null);
     setSubmittedEmail(data.email);
-    // Simulate network request — replace with real API call when endpoint is available
-    await new Promise<void>((resolve) => setTimeout(resolve, 600));
-    setState('sent');
+    try {
+      const response = await requestPasswordResetApi(data);
+      setResetResult(response);
+      setState('sent');
+    } catch (err) {
+      setState('idle');
+      if (err instanceof ApiError) {
+        setFormError(err.message);
+      } else {
+        setFormError('Something went wrong. Please try again.');
+      }
+    }
   }
 
   if (state === 'sent') {
@@ -52,10 +71,18 @@ export function ForgotPasswordForm() {
           <p className="text-sm font-medium text-slate-900">Check your inbox</p>
           <p className="mt-1 text-sm text-slate-500">
             If an account with{' '}
-            <span className="font-medium text-slate-700">{submittedEmail}</span> exists,
-            you&apos;ll receive a reset link shortly.
+            <span className="font-medium text-slate-700">{submittedEmail}</span> exists, you&apos;ll
+            receive a reset link shortly.
           </p>
         </div>
+        {resetResult?.resetLink && (
+          <a
+            href={resetResult.resetLink}
+            className="mt-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Open reset link
+          </a>
+        )}
         <Link
           href="/login"
           className="mt-2 text-sm font-semibold text-blue-700 hover:underline"
@@ -76,6 +103,12 @@ export function ForgotPasswordForm() {
         error={errors.email?.message}
         {...register('email')}
       />
+
+      {formError && (
+        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
+          {formError}
+        </p>
+      )}
 
       <button
         type="submit"

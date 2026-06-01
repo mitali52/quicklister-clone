@@ -30,7 +30,7 @@ export function LoginForm() {
     try {
       const response = await loginApi(data);
       setAuth(response);
-      router.replace('/dashboard');
+      router.replace('/welcome');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
         setFormError('Incorrect email or password. Please try again.');

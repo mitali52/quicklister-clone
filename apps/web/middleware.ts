@@ -8,13 +8,15 @@ const PROTECTED_PATHS = [
   '/listings',
   '/organizations',
   '/categories',
+  '/offers',
+  '/tenancies',
   '/admin',
   '/moderation',
   '/audit-logs',
   '/notifications',
 ];
 
-const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
+const AUTH_PATHS = ['/login', '/register'];
 
 function decodeBase64Url(value: string): string | null {
   try {
@@ -60,7 +62,7 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = hasValidRefreshToken(refreshToken);
 
   if (isPathMatch(pathname, AUTH_PATHS) && isAuthenticated) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/welcome', request.url));
   }
 
   if (isPathMatch(pathname, PROTECTED_PATHS) && !isAuthenticated) {
@@ -84,6 +86,10 @@ export const config = {
     '/organizations/:path*',
     '/categories',
     '/categories/:path*',
+    '/offers',
+    '/offers/:path*',
+    '/tenancies',
+    '/tenancies/:path*',
     '/admin',
     '/admin/:path*',
     '/moderation',
@@ -95,5 +101,6 @@ export const config = {
     '/login',
     '/register',
     '/forgot-password',
+    '/reset-password',
   ],
 };

@@ -169,13 +169,25 @@ export class UsersService {
         throw new BadRequestException('New password must be different from the current password');
       }
 
-      const newHash = await hashPassword(dto.newPassword);
-      await this.repo.updatePassword(userId, newHash);
+      await this.setPassword(userId, dto.newPassword);
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       if (err instanceof UnauthorizedException) throw err;
       if (err instanceof BadRequestException) throw err;
       throw new InternalServerErrorException('Failed to change password');
+    }
+  }
+
+  async setPassword(userId: string, newPassword: string): Promise<void> {
+    try {
+      const user = await this.repo.findById(userId);
+      if (!user) throw new NotFoundException('User not found');
+
+      const newHash = await hashPassword(newPassword);
+      await this.repo.updatePassword(userId, newHash);
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new InternalServerErrorException('Failed to update password');
     }
   }
 

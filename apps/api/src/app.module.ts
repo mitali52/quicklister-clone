@@ -15,6 +15,7 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PortalRecordsModule } from './portal-records/portal-records.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     AuditLogModule,
     DashboardModule,
+    PortalRecordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

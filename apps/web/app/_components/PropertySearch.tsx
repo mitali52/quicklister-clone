@@ -11,6 +11,11 @@ const TABS: { value: SearchType; label: string }[] = [
   { value: 'let', label: 'To Rent' },
 ];
 
+const SEARCH_TYPE_TO_LISTING_TYPE: Record<SearchType, 'residential_sale' | 'residential_let'> = {
+  sale: 'residential_sale',
+  let: 'residential_let',
+};
+
 export function PropertySearch() {
   const [type, setType] = useState<SearchType>('sale');
   const [location, setLocation] = useState('');
@@ -18,8 +23,8 @@ export function PropertySearch() {
 
   function handleSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const params = new URLSearchParams({ type });
-    if (location.trim()) params.set('location', location.trim());
+    const params = new URLSearchParams({ listingType: SEARCH_TYPE_TO_LISTING_TYPE[type] });
+    if (location.trim()) params.set('q', location.trim());
     router.push(`/search?${params.toString()}`);
   }
 

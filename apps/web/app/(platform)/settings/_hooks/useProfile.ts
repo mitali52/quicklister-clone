@@ -57,7 +57,7 @@ export function useDeleteAccount() {
     mutationFn: deleteMyAccountApi,
     onSuccess: () => {
       clearAuth();
-      router.push('/');
+      router.replace('/login');
     },
   });
 }

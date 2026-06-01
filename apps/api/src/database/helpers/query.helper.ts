@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   InternalServerErrorException,
   BadRequestException,
 } from '@nestjs/common';
@@ -16,6 +17,10 @@ interface PgError extends Error {
 }
 
 export function handleDbError(err: unknown, context?: string): never {
+  if (err instanceof HttpException) {
+    throw err;
+  }
+
   const pgErr = err as PgError;
   const detail = context ? `[${context}] ` : '';
 
@@ -40,6 +45,9 @@ export async function query<T extends QueryResultRow>(
   try {
     return await pool.query<T>(text, params);
   } catch (err) {
+    if (err instanceof HttpException) {
+      throw err;
+    }
     handleDbError(err);
   }
 }
@@ -53,6 +61,9 @@ export async function queryOne<T extends QueryResultRow>(
     const result = await pool.query<T>(text, params);
     return result.rows[0] ?? null;
   } catch (err) {
+    if (err instanceof HttpException) {
+      throw err;
+    }
     handleDbError(err);
   }
 }
@@ -69,6 +80,9 @@ export async function transaction<T>(
     return result;
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err instanceof HttpException) {
+      throw err;
+    }
     handleDbError(err);
   } finally {
     client.release();

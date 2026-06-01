@@ -24,3 +24,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const derivedHash = (await scryptAsync(password, salt, KEYLEN)) as Buffer;
   return timingSafeEqual(hashBuffer, derivedHash);
 }
+
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}

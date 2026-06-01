@@ -17,7 +17,7 @@ export function PlatformTopBar() {
       // Ignore logout API errors — clear client state regardless
     } finally {
       clearAuth();
-      router.push('/');
+      router.replace('/login');
     }
   }
 

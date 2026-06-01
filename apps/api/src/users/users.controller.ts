@@ -27,6 +27,8 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { type PaginatedResult } from './interfaces/users-repository.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { type AuthUser } from '../auth/interfaces/auth-user.interface';
 
@@ -92,6 +94,8 @@ export class UsersController {
   // ── Admin routes ────────────────────────────────────────────────────────────
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'List all users (admin)' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
@@ -108,6 +112,8 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Get a user by ID (admin)' })
   @ApiResponse({ status: 200, type: UserResponseDto })
   @ApiResponse({ status: 404 })
@@ -118,6 +124,8 @@ export class UsersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Create a user (admin)' })
   @ApiResponse({ status: 201, type: UserResponseDto })
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
@@ -126,6 +134,8 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Update a user by ID (admin)' })
   @ApiResponse({ status: 200, type: UserResponseDto })
   async update(
@@ -138,6 +148,8 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @ApiOperation({ summary: 'Soft-delete a user by ID (admin)' })
   @ApiResponse({ status: 204 })
   async remove(@Param('id') id: string): Promise<void> {

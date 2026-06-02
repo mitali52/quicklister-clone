@@ -16,7 +16,11 @@ import { type JwtPayload } from './interfaces/jwt-payload.interface';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
 import { DATABASE_POOL } from '../database/database.providers';
-import { hashPassword, hashToken, verifyPassword } from '../common/helpers/crypto.helper';
+import {
+  hashPassword,
+  hashToken,
+  verifyPassword,
+} from '../common/helpers/crypto.helper';
 import { decodeJwtKey } from '../common/helpers/jwt-key.helper';
 import { transaction } from '../database/helpers/query.helper';
 
@@ -57,11 +61,14 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<IssuedSession> {
     try {
       const existing = await this.usersService.findByEmail(dto.email);
-      if (existing) throw new ConflictException(`Email ${dto.email} is already registered`);
+      if (existing)
+        throw new ConflictException(`Email ${dto.email} is already registered`);
 
       const userRole = await this.rolesService.findByName('user');
       if (!userRole) {
-        throw new InternalServerErrorException('Default role not found — run db:seed first');
+        throw new InternalServerErrorException(
+          'Default role not found — run db:seed first',
+        );
       }
 
       const user = await this.usersService.create({
@@ -77,6 +84,7 @@ export class AuthService {
         email: user.email,
         roleId: user.roleId,
         roleName: userRole.name,
+        permissions: userRole.permissions ?? [],
       });
     } catch (err) {
       if (err instanceof ConflictException) throw err;
@@ -90,7 +98,8 @@ export class AuthService {
   async login(dto: LoginDto): Promise<IssuedSession> {
     try {
       const authUser = await this.validateUser(dto.email, dto.password);
-      if (!authUser) throw new UnauthorizedException('Invalid email or password');
+      if (!authUser)
+        throw new UnauthorizedException('Invalid email or password');
 
       return this.issueSession(authUser);
     } catch (err) {
@@ -101,7 +110,10 @@ export class AuthService {
     }
   }
 
-  async validateUser(email: string, password: string): Promise<AuthUser | null> {
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<AuthUser | null> {
     try {
       const user = await this.usersService.findByEmail(email);
       if (!user) return null;
@@ -119,6 +131,7 @@ export class AuthService {
         email: user.email,
         roleId: user.roleId,
         roleName: role.name,
+        permissions: role.permissions ?? [],
       };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
@@ -137,7 +150,11 @@ export class AuthService {
         publicKey,
       });
 
-      if (payload.tokenType !== 'refresh' || !payload.jti || !payload.familyId) {
+      if (
+        payload.tokenType !== 'refresh' ||
+        !payload.jti ||
+        !payload.familyId
+      ) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
@@ -154,6 +171,7 @@ export class AuthService {
           email: user.email,
           roleId: user.roleId,
           roleName: role.name,
+          permissions: role.permissions ?? [],
         },
         familyId: payload.familyId,
         currentJti: payload.jti,
@@ -190,7 +208,9 @@ export class AuthService {
     }
   }
 
-  async requestPasswordReset(email: string): Promise<{ message: string; resetLink: string | null }> {
+  async requestPasswordReset(
+    email: string,
+  ): Promise<{ message: string; resetLink: string | null }> {
     try {
       const user = await this.usersService.findByEmail(email);
       if (!user) {
@@ -203,7 +223,9 @@ export class AuthService {
 
       const token = randomBytes(32).toString('hex');
       const tokenHash = hashToken(token);
-      const expiresInSeconds = Number(process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN ?? 3600);
+      const expiresInSeconds = Number(
+        process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN ?? 3600,
+      );
       const frontendBaseUrl = this.getFrontendBaseUrl();
       const resetLink = new URL('/reset-password', frontendBaseUrl);
       resetLink.searchParams.set('token', token);
@@ -221,9 +243,12 @@ export class AuthService {
       };
     } catch (err) {
       if (err instanceof InternalServerErrorException) throw err;
-      throw new InternalServerErrorException('Failed to generate password reset link', {
-        cause: err instanceof Error ? err : new Error(String(err)),
-      });
+      throw new InternalServerErrorException(
+        'Failed to generate password reset link',
+        {
+          cause: err instanceof Error ? err : new Error(String(err)),
+        },
+      );
     }
   }
 
@@ -241,8 +266,14 @@ export class AuthService {
         );
 
         const resetToken = tokenResult.rows[0];
-        if (!resetToken || resetToken.used_at !== null || resetToken.expires_at.getTime() <= Date.now()) {
-          throw new UnauthorizedException('Invalid or expired password reset link');
+        if (
+          !resetToken ||
+          resetToken.used_at !== null ||
+          resetToken.expires_at.getTime() <= Date.now()
+        ) {
+          throw new UnauthorizedException(
+            'Invalid or expired password reset link',
+          );
         }
 
         const newHash = await hashPassword(newPassword);
@@ -277,7 +308,9 @@ export class AuthService {
     const privateKey = decodeJwtKey(process.env.JWT_PRIVATE_KEY);
 
     const accessExpiresIn = Number(process.env.JWT_ACCESS_EXPIRES_IN ?? 900);
-    const refreshExpiresIn = Number(process.env.JWT_REFRESH_EXPIRES_IN ?? 604800);
+    const refreshExpiresIn = Number(
+      process.env.JWT_REFRESH_EXPIRES_IN ?? 604800,
+    );
     const familyId = randomUUID();
     const refreshJti = randomUUID();
 
@@ -286,6 +319,7 @@ export class AuthService {
       email: user.email,
       roleId: user.roleId,
       roleName: user.roleName,
+      permissions: user.permissions,
       tokenType: 'refresh',
       jti: refreshJti,
       familyId,
@@ -302,7 +336,13 @@ export class AuthService {
     await this.pool.query(
       `INSERT INTO auth_sessions (user_id, jti, family_id, token_hash, expires_at)
        VALUES ($1, $2, $3, $4, NOW() + ($5 * INTERVAL '1 second'))`,
-      [user.id, refreshJti, familyId, hashToken(refreshToken), refreshExpiresIn],
+      [
+        user.id,
+        refreshJti,
+        familyId,
+        hashToken(refreshToken),
+        refreshExpiresIn,
+      ],
     );
 
     return {
@@ -326,7 +366,9 @@ export class AuthService {
   }): Promise<IssuedSession> {
     const privateKey = decodeJwtKey(process.env.JWT_PRIVATE_KEY);
     const accessExpiresIn = Number(process.env.JWT_ACCESS_EXPIRES_IN ?? 900);
-    const refreshExpiresIn = Number(process.env.JWT_REFRESH_EXPIRES_IN ?? 604800);
+    const refreshExpiresIn = Number(
+      process.env.JWT_REFRESH_EXPIRES_IN ?? 604800,
+    );
     const nextJti = randomUUID();
 
     const accessToken = this.signAccessToken(params.user);
@@ -337,6 +379,7 @@ export class AuthService {
         email: params.user.email,
         roleId: params.user.roleId,
         roleName: params.user.roleName,
+        permissions: params.user.permissions,
         tokenType: 'refresh',
         jti: nextJti,
         familyId: params.familyId,
@@ -408,6 +451,7 @@ export class AuthService {
       email: user.email,
       roleId: user.roleId,
       roleName: user.roleName,
+      permissions: user.permissions,
       tokenType: 'access',
     };
 

@@ -325,7 +325,11 @@ export function ListingDetail({ id }: ListingDetailProps) {
           )}
 
           {/* Photos */}
-          <ListingMediaManager listingId={id} isOwner={isOwner} />
+          <ListingMediaManager
+            listingId={id}
+            canViewMedia={isOwner || isModerator}
+            canManageMedia={isOwner}
+          />
 
           {/* Lifecycle actions */}
           <LifecycleActions

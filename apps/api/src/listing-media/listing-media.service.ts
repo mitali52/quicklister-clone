@@ -30,14 +30,17 @@ export class ListingMediaService {
   async findByListingId(
     listingId: string,
     requesterId: string,
+    requesterRole?: string,
   ): Promise<ListingMedia[]> {
     try {
-      await this.assertListingAccess(listingId, requesterId);
+      await this.assertListingAccess(listingId, requesterId, requesterRole);
       return await this.repo.findByListingId(listingId);
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       if (err instanceof ForbiddenException) throw err;
-      throw new InternalServerErrorException('Failed to retrieve listing media');
+      throw new InternalServerErrorException(
+        'Failed to retrieve listing media',
+      );
     }
   }
 
@@ -142,7 +145,10 @@ export class ListingMediaService {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  private async assertOwnership(listingId: string, requesterId: string): Promise<void> {
+  private async assertOwnership(
+    listingId: string,
+    requesterId: string,
+  ): Promise<void> {
     const ownerId = await this.repo.findListingOwner(listingId);
     if (!ownerId) throw new NotFoundException(`Listing ${listingId} not found`);
     if (ownerId !== requesterId) {
@@ -150,11 +156,19 @@ export class ListingMediaService {
     }
   }
 
-  private async assertListingAccess(listingId: string, requesterId: string): Promise<void> {
+  private async assertListingAccess(
+    listingId: string,
+    requesterId: string,
+    requesterRole?: string,
+  ): Promise<void> {
     const ownerId = await this.repo.findListingOwner(listingId);
     if (!ownerId) throw new NotFoundException(`Listing ${listingId} not found`);
-    // For now only the owner can list media; expand this when published listings are public
-    if (ownerId !== requesterId) {
+
+    const isModeratorOrAdmin =
+      requesterRole === 'moderator' || requesterRole === 'admin';
+
+    // Owners and staff can inspect media during review.
+    if (ownerId !== requesterId && !isModeratorOrAdmin) {
       throw new ForbiddenException('You do not have access to this listing');
     }
   }

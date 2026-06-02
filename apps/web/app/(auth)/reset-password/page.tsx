@@ -9,10 +9,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ResetPasswordPage({
+export default async function ResetPasswordPage({
   searchParams,
-}: Readonly<{ searchParams?: { token?: string } }>) {
-  const token = searchParams?.token ?? '';
+}: Readonly<{ searchParams?: Promise<{ token?: string }> }>) {
+  const token = searchParams ? (await searchParams).token ?? '' : '';
 
   return (
     <>

@@ -94,7 +94,7 @@ export interface AdminOrganizationStats {
   activeOrganizations: number;
 }
 
-export interface AdminListingStats extends DashboardListingStats {}
+export type AdminListingStats = DashboardListingStats;
 
 export interface AdminModerationStats {
   pendingReviews: number;

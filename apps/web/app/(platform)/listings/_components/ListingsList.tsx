@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useMyListings } from '../_hooks/useListings';
+import { useAuthStore } from '@/lib/stores/auth.store';
+import { useListingDirectory } from '../_hooks/useListings';
 import { ListingCard } from './ListingCard';
 
 function ListingsSkeleton() {
@@ -25,7 +26,9 @@ function ListingsSkeleton() {
 }
 
 export function ListingsList() {
-  const { data, isLoading, error } = useMyListings();
+  const roleName = useAuthStore((state) => state.user?.roleName);
+  const isStaff = roleName === 'moderator' || roleName === 'admin';
+  const { data, isLoading, error } = useListingDirectory(roleName);
 
   if (isLoading) return <ListingsSkeleton />;
 
@@ -41,16 +44,22 @@ export function ListingsList() {
   if (!data || data.data.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
-        <p className="text-sm font-medium text-slate-700">No listings yet</p>
-        <p className="mt-1 text-sm text-slate-500">
-          Create your first listing to get started.
+        <p className="text-sm font-medium text-slate-700">
+          {isStaff ? 'No listings found' : 'No listings yet'}
         </p>
-        <Link
-          href="/listings/new"
-          className="mt-4 inline-flex items-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
-        >
-          Create listing
-        </Link>
+        <p className="mt-1 text-sm text-slate-500">
+          {isStaff
+            ? 'Try adjusting the page filters or check back after more listings are submitted.'
+            : 'Create your first listing to get started.'}
+        </p>
+        {!isStaff && (
+          <Link
+            href="/listings/new"
+            className="mt-4 inline-flex items-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+          >
+            Create listing
+          </Link>
+        )}
       </div>
     );
   }

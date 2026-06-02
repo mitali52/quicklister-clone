@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 import { getDatabaseConfig } from '../database.config';
 import { seedRoles } from './role.seeder';
+import { seedPermissions } from './permission.seeder';
+import { seedRolePermissions } from './role-permission.seeder';
 import { seedUsers } from './user.seeder';
 
 async function main(): Promise<void> {
@@ -12,6 +14,8 @@ async function main(): Promise<void> {
 
   try {
     await seedRoles(pool);
+    await seedPermissions(pool);
+    await seedRolePermissions(pool);
     await seedUsers(pool); // must run after seedRoles — looks up role IDs
     console.log('Done.');
   } finally {

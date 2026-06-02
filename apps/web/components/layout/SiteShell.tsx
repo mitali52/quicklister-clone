@@ -21,6 +21,8 @@ const PLATFORM_PATHS = [
   '/sales-add-ons',
   '/property-valuation',
   '/tenant-referencing',
+  '/admin',
+  '/moderation',
 ];
 
 export function SiteShell({ children }: { children: React.ReactNode }) {

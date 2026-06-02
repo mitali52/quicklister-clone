@@ -47,8 +47,12 @@ export class ListingMediaController {
     @Param('listingId', ParseUUIDPipe) listingId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<ListingMediaResponseDto[]> {
-    const media = await this.listingMediaService.findByListingId(listingId, user.id);
-    return media.map(ListingMediaResponseDto.fromDomain);
+    const media = await this.listingMediaService.findByListingId(
+      listingId,
+      user.id,
+      user.roleName,
+    );
+    return media.map((item) => ListingMediaResponseDto.fromDomain(item));
   }
 
   @Post()
@@ -71,9 +75,15 @@ export class ListingMediaController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<ListingMediaResponseDto> {
     if (!file) {
-      throw new BadRequestException('No file provided. Send the image in a "file" form field.');
+      throw new BadRequestException(
+        'No file provided. Send the image in a "file" form field.',
+      );
     }
-    const media = await this.listingMediaService.upload(listingId, user.id, file);
+    const media = await this.listingMediaService.upload(
+      listingId,
+      user.id,
+      file,
+    );
     return ListingMediaResponseDto.fromDomain(media);
   }
 
@@ -87,8 +97,12 @@ export class ListingMediaController {
     @CurrentUser() user: AuthUser,
     @Body() dto: ReorderListingMediaDto,
   ): Promise<ListingMediaResponseDto[]> {
-    const media = await this.listingMediaService.reorder(listingId, user.id, dto);
-    return media.map(ListingMediaResponseDto.fromDomain);
+    const media = await this.listingMediaService.reorder(
+      listingId,
+      user.id,
+      dto,
+    );
+    return media.map((item) => ListingMediaResponseDto.fromDomain(item));
   }
 
   @Delete(':mediaId')

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import type { AuthUser } from '@/lib/schemas/auth.schemas';
 import {
   getMyListingsApi,
   getListingApi,
@@ -21,6 +22,10 @@ const MY_LISTINGS_KEY = ['listings', 'me'] as const;
 const PENDING_REVIEW_KEY = ['listings', 'pending-review'] as const;
 const ALL_LISTINGS_KEY = ['listings', 'all'] as const;
 const listingKey = (id: string) => ['listings', id] as const;
+
+function isStaff(roleName: AuthUser['roleName'] | undefined): boolean {
+  return roleName === 'moderator' || roleName === 'admin';
+}
 
 export function useMyListings(page = 1, limit = 20) {
   return useQuery({
@@ -47,6 +52,15 @@ export function useAllListings(page = 1, limit = 20) {
   return useQuery({
     queryKey: [...ALL_LISTINGS_KEY, page, limit],
     queryFn: () => getAllListingsApi(page, limit),
+  });
+}
+
+export function useListingDirectory(roleName: AuthUser['roleName'] | undefined, page = 1, limit = 20) {
+  const staffView = isStaff(roleName);
+
+  return useQuery({
+    queryKey: [...(staffView ? ALL_LISTINGS_KEY : MY_LISTINGS_KEY), page, limit],
+    queryFn: () => (staffView ? getAllListingsApi(page, limit) : getMyListingsApi(page, limit)),
   });
 }
 

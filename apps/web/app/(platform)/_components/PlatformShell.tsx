@@ -57,17 +57,6 @@ function ToolIcon() {
   );
 }
 
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 7H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16V7z" />
-      <path d="M16 11h4" />
-      <path d="M14 11h.01" />
-      <path d="M3 7V5a2 2 0 0 1 2-2h14" />
-    </svg>
-  );
-}
-
 function Badge({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
@@ -75,18 +64,6 @@ function Badge({ children }: { children: ReactNode }) {
     </span>
   );
 }
-
-const mainNav: NavItem[] = [
-  { label: 'Properties', href: '/welcome', icon: <HomeIcon /> },
-  { label: 'Messages', href: '/messages', icon: <MessageIcon /> },
-  { label: 'Calendar', href: '/calendar', icon: <CalendarIcon />, badge: 'NEW' },
-  { label: 'My Offers', href: '/offers', icon: <ToolIcon /> },
-  { label: 'My Tenancies', href: '/tenancies', icon: <ToolIcon /> },
-  { label: 'Lettings Add-ons', href: '/lettings-add-ons', icon: <ToolIcon /> },
-  { label: 'Sales Add-ons', href: '/sales-add-ons', icon: <ToolIcon /> },
-  { label: 'Property Valuation', href: '/property-valuation', icon: <ToolIcon /> },
-  { label: 'Tenant Referencing', href: '/tenant-referencing', icon: <ToolIcon /> },
-];
 
 const accountNav = [
   { label: 'My Account', href: '/settings' },
@@ -133,6 +110,9 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearAuth = useAuthStore((state) => state.clearAuth);
+  const roleName = user?.roleName ?? 'user';
+  const isAdmin = roleName === 'admin';
+  const isModerator = roleName === 'moderator';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(true);
   const { data: profile } = useQuery({
@@ -143,6 +123,40 @@ export function PlatformShell({ children }: { children: ReactNode }) {
 
   const displayName =
     profile?.fullName ?? user?.email?.split('@')[0] ?? user?.email ?? 'My Account';
+
+  const adminNav: NavItem[] =
+    isAdmin
+      ? [
+          { label: 'Admin home', href: '/admin', icon: <HomeIcon /> },
+          { label: 'Users', href: '/admin/users', icon: <ToolIcon /> },
+          { label: 'Organizations', href: '/admin/organizations', icon: <ToolIcon /> },
+          { label: 'Listings', href: '/admin/listings', icon: <ToolIcon /> },
+          { label: 'Audit logs', href: '/admin/audit-logs', icon: <ToolIcon /> },
+        ]
+      : [];
+
+  const moderationNav: NavItem[] =
+    isAdmin || isModerator
+      ? [{ label: 'Review queue', href: '/moderation', icon: <ToolIcon /> }]
+      : [];
+
+  const userNav: NavItem[] = [
+    { label: 'Properties', href: '/welcome', icon: <HomeIcon /> },
+    { label: 'Messages', href: '/messages', icon: <MessageIcon /> },
+    { label: 'Calendar', href: '/calendar', icon: <CalendarIcon />, badge: 'NEW' },
+    { label: 'My Offers', href: '/offers', icon: <ToolIcon /> },
+    { label: 'My Tenancies', href: '/tenancies', icon: <ToolIcon /> },
+    { label: 'Lettings Add-ons', href: '/lettings-add-ons', icon: <ToolIcon /> },
+    { label: 'Sales Add-ons', href: '/sales-add-ons', icon: <ToolIcon /> },
+    { label: 'Property Valuation', href: '/property-valuation', icon: <ToolIcon /> },
+    { label: 'Tenant Referencing', href: '/tenant-referencing', icon: <ToolIcon /> },
+  ];
+
+  const adminAccountNav = [
+    { label: 'Admin Home', href: '/admin' },
+    { label: 'Review Queue', href: '/moderation' },
+    { label: 'Audit Logs', href: '/admin/audit-logs' },
+  ];
 
   async function handleLogout() {
     try {
@@ -191,10 +205,10 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         {accountOpen && (
           <div className="mt-3 rounded-2xl bg-white px-3 py-3 text-slate-900 shadow-sm">
             <p className="px-1 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
-              My Account
+              {isAdmin || isModerator ? 'Admin Menu' : 'My Account'}
             </p>
             <div className="mt-2 space-y-1">
-              {accountNav.map((item) => {
+              {(isAdmin || isModerator ? adminAccountNav : accountNav).map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
                   <Link
@@ -225,15 +239,65 @@ export function PlatformShell({ children }: { children: ReactNode }) {
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Menu</p>
         <nav className="mt-3 space-y-1">
-          {mainNav.map((item) => (
+          {isAdmin ? (
             <PlatformNavLink
-              key={item.href}
-              item={item}
+              item={{ label: 'Admin home', href: '/admin', icon: <HomeIcon /> }}
               pathname={pathname}
               onNavigate={() => setMobileOpen(false)}
             />
-          ))}
+          ) : isModerator ? (
+            <PlatformNavLink
+              item={{ label: 'Review queue', href: '/moderation', icon: <ToolIcon /> }}
+              pathname={pathname}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ) : (
+            userNav.map((item) => (
+              <PlatformNavLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ))
+          )}
         </nav>
+
+        {moderationNav.length > 0 && (
+          <>
+            <p className="mt-6 px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+              Moderation
+            </p>
+            <nav className="mt-3 space-y-1">
+              {moderationNav.map((item) => (
+                <PlatformNavLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+            </nav>
+          </>
+        )}
+
+        {adminNav.length > 0 && (
+          <>
+            <p className="mt-6 px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
+              Admin
+            </p>
+            <nav className="mt-3 space-y-1">
+              {adminNav.map((item) => (
+                <PlatformNavLink
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+            </nav>
+          </>
+        )}
 
         <p className="mt-6 px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Tools</p>
         <div className="mt-3 rounded-2xl bg-white/5 px-3 py-4 text-sm text-slate-200">

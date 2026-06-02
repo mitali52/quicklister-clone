@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { UsersModule } from './users/users.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ListingsModule } from './listings/listings.module';
@@ -22,6 +23,7 @@ import { PortalRecordsModule } from './portal-records/portal-records.module';
     DatabaseModule,
     AuthModule,
     RolesModule,
+    PermissionsModule,
     UsersModule,
     OrganizationsModule,
     ListingsModule,

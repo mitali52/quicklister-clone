@@ -342,7 +342,7 @@ export function DashboardContent() {
 
             <SectionCard title="Quick actions" subtitle="Shortcuts for moderation tasks.">
               <div className="grid gap-3">
-                <Link href="/listings" className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                <Link href="/moderation" className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">
                   Review listings
                 </Link>
                 <Link href="/categories" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
@@ -396,13 +396,16 @@ export function DashboardContent() {
 
             <SectionCard title="Quick actions" subtitle="Administrative shortcuts.">
               <div className="grid gap-3">
-                <Link href="/organizations" className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                <Link href="/admin" className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">
+                  Admin home
+                </Link>
+                <Link href="/admin/users" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  Manage users
+                </Link>
+                <Link href="/admin/organizations" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   Manage organizations
                 </Link>
-                <Link href="/categories" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                  Manage categories
-                </Link>
-                <Link href="/listings" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <Link href="/moderation" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   Review listings
                 </Link>
               </div>

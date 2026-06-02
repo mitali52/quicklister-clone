@@ -10,10 +10,11 @@ import {
   type ReorderMediaItem,
 } from '@/lib/api/listing-media.api';
 
-export function useListingMedia(listingId: string) {
+export function useListingMedia(listingId: string, enabled = true) {
   return useQuery({
     queryKey: ['listings', listingId, 'media'],
     queryFn: () => getListingMediaApi(listingId),
+    enabled,
   });
 }
 

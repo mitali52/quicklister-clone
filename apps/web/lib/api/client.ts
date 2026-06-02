@@ -12,35 +12,59 @@ class ApiError extends Error {
   }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, setAuth, clearAuth } = useAuthStore.getState();
-  if (!refreshToken) return null;
+type AuthSessionResponse = {
+  accessToken: string;
+  expiresIn: number;
+  user: { id: string; email: string; roleName: string };
+};
 
-  try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
+let refreshInFlight: Promise<AuthSessionResponse | null> | null = null;
 
-    if (!res.ok) {
+function applyAuthSession(session: AuthSessionResponse): void {
+  useAuthStore.getState().setAuth(session);
+}
+
+async function performSessionRefresh(): Promise<AuthSessionResponse | null> {
+  if (refreshInFlight !== null) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const { clearAuth } = useAuthStore.getState();
+
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          clearAuth();
+        }
+        return null;
+      }
+
+      const data = (await res.json()) as AuthSessionResponse;
+      applyAuthSession(data);
+      return data;
+    } catch {
       clearAuth();
       return null;
+    } finally {
+      refreshInFlight = null;
     }
+  })();
 
-    const data = (await res.json()) as { accessToken: string };
-    // Merge the new access token into the existing auth state
-    const current = useAuthStore.getState();
-    setAuth({
-      accessToken: data.accessToken,
-      refreshToken: current.refreshToken ?? '',
-      expiresIn: 900,
-      user: current.user ?? { id: '', email: '', roleName: '' },
-    });
-    return data.accessToken;
-  } catch {
-    clearAuth();
-    return null;
+  return refreshInFlight;
+}
+
+export async function bootstrapAuthSession(): Promise<void> {
+  if (useAuthStore.getState().status !== 'loading') {
+    return;
+  }
+
+  await performSessionRefresh();
+  if (useAuthStore.getState().status === 'loading') {
+    useAuthStore.getState().clearAuth();
   }
 }
 
@@ -64,11 +88,15 @@ async function request<T>(
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
 
-  if (res.status === 401 && retry) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
+  const shouldAttemptRefresh =
+    retry && !path.startsWith('/auth/logout') && !path.startsWith('/auth/refresh');
+
+  if (res.status === 401 && shouldAttemptRefresh) {
+    const newSession = await performSessionRefresh();
+    if (newSession) {
       return request<T>(method, path, body, false);
     }
     throw new ApiError(401, 'Session expired. Please sign in again.');
@@ -115,6 +143,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
     method: 'POST',
     headers,
     body: formData,
+    credentials: 'include',
   });
 
   if (res.ok) {

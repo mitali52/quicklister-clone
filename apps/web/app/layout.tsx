@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { SiteShell } from '@/components/layout/SiteShell';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { AuthBootstrapper } from '@/components/providers/AuthBootstrapper';
 
 export const metadata: Metadata = {
   title: {
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-white text-slate-900">
         <QueryProvider>
+          <AuthBootstrapper />
           <SiteShell>{children}</SiteShell>
         </QueryProvider>
       </body>

@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { UsersModule } from './users/users.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ListingsModule } from './listings/listings.module';
@@ -14,12 +15,15 @@ import { ModerationModule } from './moderation/moderation.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { PortalRecordsModule } from './portal-records/portal-records.module';
 
 @Module({
   imports: [
     DatabaseModule,
     AuthModule,
     RolesModule,
+    PermissionsModule,
     UsersModule,
     OrganizationsModule,
     ListingsModule,
@@ -30,6 +34,8 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     AdminModule,
     NotificationsModule,
     AuditLogModule,
+    DashboardModule,
+    PortalRecordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

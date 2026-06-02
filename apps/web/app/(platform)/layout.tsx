@@ -1,17 +1,20 @@
+import type { Metadata } from 'next';
 import { AuthGuard } from './_components/AuthGuard';
-import { PlatformTopBar } from './_components/PlatformTopBar';
+import { PlatformShell } from './_components/PlatformShell';
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function PlatformLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <AuthGuard>
-      <div className="flex min-h-screen flex-col bg-slate-50">
-        <PlatformTopBar />
-        <div className="flex flex-1">
-          {children}
-        </div>
-      </div>
+      <PlatformShell>{children}</PlatformShell>
     </AuthGuard>
   );
 }

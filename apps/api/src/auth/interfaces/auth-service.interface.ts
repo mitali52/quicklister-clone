@@ -4,10 +4,10 @@ import { type RegisterDto } from '../dto/register.dto';
 import { type AuthUser } from './auth-user.interface';
 
 export interface IAuthService {
-  register(dto: RegisterDto): Promise<AuthResponseDto>;
-  login(dto: LoginDto): Promise<AuthResponseDto>;
-  refresh(refreshToken: string): Promise<{ accessToken: string }>;
-  logout(userId: string): Promise<void>;
+  register(dto: RegisterDto): Promise<AuthResponseDto & { refreshToken: string; refreshExpiresIn: number }>;
+  login(dto: LoginDto): Promise<AuthResponseDto & { refreshToken: string; refreshExpiresIn: number }>;
+  refresh(refreshToken: string): Promise<AuthResponseDto & { refreshToken: string; refreshExpiresIn: number }>;
+  logout(refreshToken?: string | null): Promise<void>;
   validateUser(email: string, password: string): Promise<AuthUser | null>;
 }
 

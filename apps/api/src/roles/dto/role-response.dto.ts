@@ -4,6 +4,7 @@ export class RoleResponseDto {
   id: string;
   name: string;
   description: string;
+  permissions: string[];
   createdAt: Date;
   updatedAt: Date;
 
@@ -12,6 +13,7 @@ export class RoleResponseDto {
     dto.id = role.id;
     dto.name = role.name;
     dto.description = role.description;
+    dto.permissions = role.permissions;
     dto.createdAt = role.createdAt;
     dto.updatedAt = role.updatedAt;
     return dto;

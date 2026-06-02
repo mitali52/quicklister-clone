@@ -70,10 +70,22 @@ export class ListingsService {
 
   // ── Single listing ────────────────────────────────────────────────────────
 
-  async findById(id: string, requesterId: string, requesterRole: string): Promise<Listing> {
+  async findById(
+    id: string,
+    requesterId?: string,
+    requesterRole?: string,
+  ): Promise<Listing> {
     try {
       const listing = await this.repo.findById(id);
       if (!listing) throw new NotFoundException(`Listing ${id} not found`);
+
+      // Anonymous users can only see published listings.
+      if (!requesterRole || !requesterId) {
+        if (listing.status !== 'published') {
+          throw new ForbiddenException('You do not have access to this listing');
+        }
+        return listing;
+      }
 
       // Moderators/admins can view any listing; users can only view their own
       if (!isModeratorOrAdmin(requesterRole) && listing.userId !== requesterId) {

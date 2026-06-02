@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  Req,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -29,6 +30,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('listings')
 @ApiBearerAuth()
@@ -106,15 +108,16 @@ export class ListingsController {
   // ── Item routes ───────────────────────────────────────────────────────────
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get a listing by ID' })
   @ApiParam({ name: 'id', description: 'Listing UUID' })
   @ApiResponse({ status: 200, type: ListingResponseDto })
   @ApiResponse({ status: 404 })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: AuthUser,
+    @Req() req: { user?: AuthUser },
   ): Promise<ListingResponseDto> {
-    const listing = await this.listingsService.findById(id, user.id, user.roleName);
+    const listing = await this.listingsService.findById(id, req.user?.id, req.user?.roleName);
     return ListingResponseDto.fromDomain(listing);
   }
 

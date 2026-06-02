@@ -20,7 +20,8 @@ const MAX_IMAGES = 20;
 
 interface ListingMediaManagerProps {
   listingId: string;
-  isOwner: boolean;
+  canViewMedia: boolean;
+  canManageMedia: boolean;
 }
 
 // ── Single media card ─────────────────────────────────────────────────────────
@@ -244,10 +245,14 @@ function UploadZone({ listingId, count }: UploadZoneProps) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function ListingMediaManager({ listingId, isOwner }: ListingMediaManagerProps) {
-  const { data: media = [], isLoading, error } = useListingMedia(listingId);
+export function ListingMediaManager({ listingId, canViewMedia, canManageMedia }: ListingMediaManagerProps) {
+  const { data: media = [], isLoading, error } = useListingMedia(listingId, canViewMedia);
   const reorder = useReorderListingMedia(listingId);
   const deleteMedia = useDeleteListingMedia(listingId);
+
+  if (!canViewMedia) {
+    return null;
+  }
 
   function moveItem(index: number, direction: 'up' | 'down') {
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
@@ -298,7 +303,7 @@ export function ListingMediaManager({ listingId, isOwner }: ListingMediaManagerP
                   media={item}
                   index={index}
                   total={media.length}
-                  isOwner={isOwner}
+                  isOwner={canManageMedia}
                   onMoveUp={() => moveItem(index, 'up')}
                   onMoveDown={() => moveItem(index, 'down')}
                   onDelete={() => void deleteMedia.mutateAsync(item.id)}
@@ -308,11 +313,11 @@ export function ListingMediaManager({ listingId, isOwner }: ListingMediaManagerP
             </div>
           )}
 
-          {media.length === 0 && !isOwner && (
+          {media.length === 0 && !canManageMedia && (
             <p className="text-center text-sm text-slate-500">No photos added yet.</p>
           )}
 
-          {isOwner && (
+          {canManageMedia && (
             <UploadZone listingId={listingId} count={media.length} />
           )}
         </div>

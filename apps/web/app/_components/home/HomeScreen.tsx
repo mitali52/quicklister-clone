@@ -1,6 +1,25 @@
 import Link from 'next/link';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
 
+const ORGANIZATION_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Quicklister',
+  url: 'https://quicklister.co.uk',
+};
+
+const WEBSITE_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Quicklister',
+  url: 'https://quicklister.co.uk',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: 'https://quicklister.co.uk/search?q={search_term_string}',
+    'query-input': 'required name=search_term_string',
+  },
+};
+
 function ArrowIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -39,14 +58,14 @@ function PortalRow() {
   const portals = ['Zoopla', 'rightmove', 'OnTheMarket', 'PrimeLocation', 'Property Redress'];
 
   return (
-    <section className="bg-white px-6 py-10 sm:px-8 lg:px-10">
+    <section className="bg-white px-4 py-10 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
-        <p className="text-lg font-semibold text-slate-700">View our listings on</p>
-        <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-5 sm:gap-x-10 lg:gap-x-14">
+        <p className="text-base font-semibold text-slate-700 sm:text-lg">View our listings on</p>
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-4 sm:gap-x-10 lg:gap-x-14">
           {portals.map((portal) => (
             <span
               key={portal}
-              className="text-lg font-extrabold tracking-tight text-slate-500 sm:text-xl"
+              className="text-base font-extrabold tracking-tight text-slate-500 sm:text-xl"
             >
               {portal}
             </span>
@@ -69,8 +88,8 @@ function HeroMockup() {
             <div className="ml-3 h-3.5 w-24 rounded bg-slate-500/70" />
           </div>
         </div>
-        <div className="grid h-[300px] grid-cols-[88px_1fr_108px] bg-white">
-          <div className="bg-slate-800 p-3">
+        <div className="grid h-[240px] grid-cols-[72px_minmax(0,1fr)_86px] bg-white sm:h-[300px] sm:grid-cols-[88px_1fr_108px]">
+          <div className="bg-slate-800 p-2.5 sm:p-3">
             <div className="mb-3 h-5 w-16 rounded bg-cyan-400" />
             <div className="space-y-2">
               {['Dashboard', 'Properties', 'Messages', 'Billing', 'Viewings'].map((item) => (
@@ -78,8 +97,8 @@ function HeroMockup() {
               ))}
             </div>
           </div>
-          <div className="bg-slate-50 p-4">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-50 p-2.5 sm:p-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
               {['Sales Progression', 'Property Management', 'Enquiry Summary', 'Recent Actions'].map((card) => (
                 <div key={card} className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
                   <div className="h-2.5 w-24 rounded bg-slate-200" />
@@ -88,7 +107,7 @@ function HeroMockup() {
               ))}
             </div>
           </div>
-          <div className="bg-gradient-to-br from-indigo-700 via-blue-700 to-cyan-500 p-3">
+          <div className="bg-gradient-to-br from-indigo-700 via-blue-700 to-cyan-500 p-2.5 sm:p-3">
             <div className="rounded-xl bg-slate-900/85 p-3 text-white">
               <div className="h-2.5 w-16 rounded bg-slate-500" />
               <div className="mt-3 h-8 rounded-lg bg-slate-700" />
@@ -97,7 +116,7 @@ function HeroMockup() {
           </div>
         </div>
       </div>
-      <div className="absolute -bottom-3 -left-4 rounded-xl bg-white px-3 py-2 text-sm shadow-[0_14px_28px_rgba(15,23,42,0.18)] ring-1 ring-slate-100">
+      <div className="absolute -bottom-3 left-2 rounded-xl bg-white px-3 py-2 text-xs shadow-[0_14px_28px_rgba(15,23,42,0.18)] ring-1 ring-slate-100 sm:-left-4 sm:text-sm">
         <div className="flex items-center gap-1 text-amber-400">
           <span className="font-semibold text-slate-700">Google</span>
           <StarIcon />
@@ -114,8 +133,8 @@ function HeroMockup() {
 function PlatformMockup() {
   return (
     <div className="relative rounded-2xl bg-white shadow-[0_22px_50px_rgba(15,23,42,0.16)] ring-1 ring-slate-100">
-      <div className="grid min-h-[330px] grid-cols-[142px_1fr]">
-        <div className="bg-slate-50 p-4">
+      <div className="grid min-h-[300px] grid-cols-[110px_minmax(0,1fr)] sm:min-h-[330px] sm:grid-cols-[142px_1fr]">
+        <div className="bg-slate-50 p-3 sm:p-4">
           <div className="mb-4 h-7 w-28 rounded bg-indigo-600" />
           <div className="space-y-2">
             {['Overview', 'Properties', 'Messages', 'Reports', 'Billing'].map((item) => (
@@ -126,7 +145,7 @@ function PlatformMockup() {
             ))}
           </div>
         </div>
-        <div className="bg-white p-4">
+        <div className="bg-white p-3 sm:p-4">
           <div className="mb-4 h-5 w-44 rounded bg-slate-200" />
           <div className="grid gap-3 sm:grid-cols-2">
             {[
@@ -142,7 +161,7 @@ function PlatformMockup() {
           </div>
         </div>
       </div>
-      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-xl bg-white px-5 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-slate-100">
+      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-xl bg-white px-4 py-2.5 shadow-[0_12px_28px_rgba(15,23,42,0.16)] ring-1 ring-slate-100 sm:px-5 sm:py-3">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-700">Google</span>
           <div className="flex text-amber-400">
@@ -168,10 +187,10 @@ function DarkBenefits() {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-slate-800 py-20 text-white">
+    <section className="relative overflow-hidden bg-slate-800 py-16 text-white sm:py-20">
       <div className="absolute inset-x-0 top-0 h-10 -skew-y-3 bg-slate-800" />
       <div className="absolute inset-x-0 bottom-0 h-10 skew-y-3 bg-slate-800" />
-      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
           <div>
             <p className="text-sm font-semibold text-cyan-400">Why QuicklisterPro</p>
@@ -200,8 +219,8 @@ function DarkBenefits() {
 
 function Testimonials() {
   return (
-    <section className="bg-white py-20 sm:py-24">
-      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+    <section className="bg-white py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)] lg:gap-20">
           <div>
             <p className="text-sm font-semibold text-cyan-400">Client Satisfaction</p>
@@ -214,8 +233,8 @@ function Testimonials() {
               </div>
               <span className="text-sm text-slate-500">68 reviews</span>
             </div>
-            <p className="mt-8 text-7xl font-extrabold tracking-tight text-cyan-400">24hrs</p>
-            <p className="mt-4 max-w-sm text-3xl font-bold leading-tight text-slate-800">
+            <p className="mt-8 text-5xl font-extrabold tracking-tight text-cyan-400 sm:text-7xl">24hrs</p>
+            <p className="mt-4 max-w-sm text-2xl font-bold leading-tight text-slate-800 sm:text-3xl">
               Average time our customers have their listing live on Rightmove and Zoopla after submission.
             </p>
           </div>
@@ -401,6 +420,13 @@ function TopHero() {
 export function HomeScreen() {
   return (
     <div className="bg-white">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([ORGANIZATION_JSON_LD, WEBSITE_JSON_LD]),
+        }}
+      />
       <TopHero />
       <PortalRow />
       <section className="bg-white py-8">
@@ -437,8 +463,8 @@ export function HomeScreen() {
       <DarkBenefits />
       <Testimonials />
 
-      <section className="overflow-hidden bg-cyan-500 py-16">
-        <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+      <section className="overflow-hidden bg-cyan-500 py-14 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(220px,260px)_minmax(0,1fr)]">
             <div className="rounded-2xl bg-white/85 p-4 shadow-xl">
               <div className="h-56 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300" />

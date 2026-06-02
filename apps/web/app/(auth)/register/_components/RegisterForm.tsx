@@ -68,7 +68,7 @@ export function RegisterForm() {
         phoneNumber: undefined,
       });
       setAuth(response);
-      router.push('/dashboard');
+      router.replace('/welcome');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setFormError('An account with this email already exists. Sign in instead?');
